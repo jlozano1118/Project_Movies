@@ -1,0 +1,37 @@
+from sqlmodel import SQLModel, Field
+from typing import Optional
+from datetime import date
+
+
+class Usuario(SQLModel, table=True):
+    id_usuario: Optional[int] = Field(default=None, primary_key=True)
+    nombre: str
+    correo: str = Field(unique=True, index=True)
+    clave: str
+
+
+class PeliculaSerie(SQLModel, table=True):
+    id_titulo: Optional[int] = Field(default=None, primary_key=True)
+    titulo: str
+    genero: str
+    anio_estreno: int
+    duracion: int
+    descripcion: str
+
+
+class Valoracion(SQLModel, table=True):
+    id_valoracion: Optional[int] = Field(default=None, primary_key=True)
+    puntuacion: float
+    comentario: str
+    fecha: date
+    id_usuario_FK: int = Field(foreign_key="usuario.id_usuario", index=True)
+    id_titulo_FK: int = Field(foreign_key="peliculaserie.id_titulo", index=True)
+
+
+class Rutina(SQLModel, table=True):
+    id_rutina: Optional[int] = Field(default=None, primary_key=True)
+    nombre: str
+    fecha_inicio: date
+    fecha_fin: date
+    id_usuario_FK: int = Field(foreign_key="usuario.id_usuario", index=True)
+    id_titulo_FK: int = Field(foreign_key="peliculaserie.id_titulo", index=True)
