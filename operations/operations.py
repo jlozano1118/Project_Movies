@@ -4,7 +4,6 @@ from datetime import date
 from data.models import Usuario, PeliculaSerie, Valoracion, Rutina
 
 
-
 def crear_usuario(session: Session, usuario: Usuario):
     existente = session.exec(select(Usuario).where(Usuario.correo == usuario.correo)).first()
     if existente:
@@ -62,6 +61,7 @@ def eliminar_usuario(session: Session, id_usuario: int):
 
 
 
+
 def crear_titulo(session: Session, titulo: PeliculaSerie):
     existente = session.exec(select(PeliculaSerie).where(PeliculaSerie.titulo == titulo.titulo)).first()
     if existente:
@@ -83,7 +83,7 @@ def obtener_titulo_por_id(session: Session, id_titulo: int):
     if not titulo:
         raise HTTPException(status_code=404, detail=f"Título con ID {id_titulo} no encontrado")
 
-
+    # Carga de relaciones
     _ = titulo.valoraciones
     _ = titulo.rutinas
     return titulo
@@ -113,6 +113,7 @@ def eliminar_titulo(session: Session, id_titulo: int):
     session.delete(titulo)
     session.commit()
     return {"mensaje": f"Título con ID {id_titulo} eliminado correctamente"}
+
 
 
 
@@ -165,6 +166,8 @@ def eliminar_valoracion(session: Session, id_valoracion: int):
     session.delete(valoracion)
     session.commit()
     return {"mensaje": f"Valoración con ID {id_valoracion} eliminada correctamente"}
+
+
 
 
 def crear_rutina(session: Session, rutina: Rutina):
