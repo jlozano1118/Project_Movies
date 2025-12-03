@@ -562,3 +562,10 @@ select:disabled {
         flex-direction: column;
     }
 }
+/* --- FIX: CORRECCIÓN DE DESPLEGABLES --- */
+/* Esto fuerza a que las opciones tengan fondo oscuro para que se vean las letras blancas */
+select option {
+    background-color: #221f1f; /* Mismo color oscuro de tu tema */
+    color: #f5f5f1; /* Texto claro */
+    padding: 10px;
+}
