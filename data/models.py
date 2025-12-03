@@ -57,3 +57,34 @@ class Rutina(SQLModel, table=True):
 
     usuario: Optional["Usuario"] = Relationship(back_populates="rutinas")
     titulo: Optional["PeliculaSerie"] = Relationship(back_populates="rutinas")
+
+
+# Schemas para crear entidades sin ID (para el POST)
+class UsuarioCreate(SQLModel):
+    nombre: str
+    correo: str
+    clave: str
+
+
+class PeliculaSerieCreate(SQLModel):
+    titulo: str
+    genero: str
+    anio_estreno: int
+    duracion: int
+    descripcion: str
+
+
+class ValoracionCreate(SQLModel):
+    puntuacion: float
+    comentario: str
+    fecha: date
+    id_usuario_FK: int
+    id_titulo_FK: int
+
+
+class RutinaCreate(SQLModel):
+    nombre: str
+    fecha_inicio: date
+    fecha_fin: date
+    id_usuario_FK: int
+    id_titulo_FK: int
