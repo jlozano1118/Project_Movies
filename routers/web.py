@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
 from datetime import date, datetime
+import calendar # IMPORTANTE: Para generar el calendario
 from typing import Optional
 
 from utils.db import get_session
@@ -129,27 +130,21 @@ async def restaurar_titulo_web(id_titulo: int, session: Session = Depends(get_se
 
 
 # ==========================================
-# GESTIÓN DE VALORACIONES (ACTUALIZADO)
+# GESTIÓN DE VALORACIONES
 # ==========================================
 
 @router.get("/valoraciones", response_class=HTMLResponse)
 async def pagina_valoraciones(request: Request, session: Session = Depends(get_session)):
-    # 1. Separar listas
     activas = session.exec(select(Valoracion).where(Valoracion.is_active == True)).all()
     inactivas = session.exec(select(Valoracion).where(Valoracion.is_active == False)).all()
-    
-    # 2. Diccionarios para mostrar nombres
     usuarios = session.exec(select(Usuario)).all()
     titulos = session.exec(select(PeliculaSerie)).all()
     usuarios_dict = {u.id_usuario: u for u in usuarios}
     titulos_dict = {t.id_titulo: t for t in titulos}
     
     return templates.TemplateResponse("valoraciones.html", {
-        "request": request, 
-        "valoraciones_activas": activas,
-        "valoraciones_inactivas": inactivas,
-        "usuarios_dict": usuarios_dict, 
-        "titulos_dict": titulos_dict
+        "request": request, "valoraciones_activas": activas, "valoraciones_inactivas": inactivas,
+        "usuarios_dict": usuarios_dict, "titulos_dict": titulos_dict
     })
 
 @router.get("/valoraciones/crear", response_class=HTMLResponse)
@@ -157,16 +152,11 @@ async def pagina_crear_valoracion(request: Request, session: Session = Depends(g
     usuarios = session.exec(select(Usuario).where(Usuario.is_active == True)).all()
     titulos = session.exec(select(PeliculaSerie).where(PeliculaSerie.is_active == True)).all()
     return templates.TemplateResponse("valoracion_form.html", {
-        "request": request, "accion": "Crear", "valoracion": None,
-        "usuarios": usuarios, "titulos": titulos
+        "request": request, "accion": "Crear", "valoracion": None, "usuarios": usuarios, "titulos": titulos
     })
 
 @router.post("/valoraciones/crear")
-async def crear_valoracion_web(
-    id_usuario_FK: int = Form(...), id_titulo_FK: int = Form(...),
-    puntuacion: float = Form(...), comentario: str = Form(...),
-    fecha: str = Form(...), session: Session = Depends(get_session)
-):
+async def crear_valoracion_web(id_usuario_FK: int = Form(...), id_titulo_FK: int = Form(...), puntuacion: float = Form(...), comentario: str = Form(...), fecha: str = Form(...), session: Session = Depends(get_session)):
     fecha_obj = datetime.strptime(fecha, "%Y-%m-%d").date()
     nueva_val = Valoracion(id_usuario_FK=id_usuario_FK, id_titulo_FK=id_titulo_FK, puntuacion=puntuacion, comentario=comentario, fecha=fecha_obj)
     session.add(nueva_val)
@@ -176,29 +166,18 @@ async def crear_valoracion_web(
 @router.get("/valoraciones/editar/{id_valoracion}", response_class=HTMLResponse)
 async def pagina_editar_valoracion(id_valoracion: int, request: Request, session: Session = Depends(get_session)):
     valoracion = session.get(Valoracion, id_valoracion)
-    # Necesitamos las listas para los Selects
     usuarios = session.exec(select(Usuario).where(Usuario.is_active == True)).all()
     titulos = session.exec(select(PeliculaSerie).where(PeliculaSerie.is_active == True)).all()
-    
-    return templates.TemplateResponse("valoracion_form.html", {
-        "request": request, "accion": "Editar", "valoracion": valoracion,
-        "usuarios": usuarios, "titulos": titulos
-    })
+    return templates.TemplateResponse("valoracion_form.html", {"request": request, "accion": "Editar", "valoracion": valoracion, "usuarios": usuarios, "titulos": titulos})
 
 @router.post("/valoraciones/editar/{id_valoracion}")
-async def editar_valoracion_web(
-    id_valoracion: int,
-    id_usuario_FK: int = Form(...), id_titulo_FK: int = Form(...),
-    puntuacion: float = Form(...), comentario: str = Form(...),
-    fecha: str = Form(...), session: Session = Depends(get_session)
-):
+async def editar_valoracion_web(id_valoracion: int, id_usuario_FK: int = Form(...), id_titulo_FK: int = Form(...), puntuacion: float = Form(...), comentario: str = Form(...), fecha: str = Form(...), session: Session = Depends(get_session)):
     val = session.get(Valoracion, id_valoracion)
     val.id_usuario_FK = id_usuario_FK
     val.id_titulo_FK = id_titulo_FK
     val.puntuacion = puntuacion
     val.comentario = comentario
     val.fecha = datetime.strptime(fecha, "%Y-%m-%d").date()
-    
     session.commit()
     return RedirectResponse(url="/web/valoraciones?mensaje=Valoración actualizada", status_code=303)
 
@@ -222,23 +201,62 @@ async def restaurar_valoracion_web(id_valoracion: int, session: Session = Depend
 
 
 # ==========================================
-# GESTIÓN DE RUTINAS
+# GESTIÓN DE RUTINAS (PLANEADOR SEMANAL)
 # ==========================================
 
 @router.get("/rutinas", response_class=HTMLResponse)
 async def pagina_rutinas(request: Request, session: Session = Depends(get_session)):
+    # 1. Obtener todas las rutinas activas
     rutinas = session.exec(select(Rutina).where(Rutina.is_active == True)).all()
+    
+    # 2. Organizar rutinas por fecha (Key: "YYYY-MM-DD", Value: Lista de rutinas)
+    rutinas_map = {}
+    for r in rutinas:
+        fecha_str = r.fecha_inicio.strftime("%Y-%m-%d")
+        if fecha_str not in rutinas_map:
+            rutinas_map[fecha_str] = []
+        rutinas_map[fecha_str].append(r)
+
+    # 3. Diccionarios para nombres
     usuarios = session.exec(select(Usuario)).all()
     titulos = session.exec(select(PeliculaSerie)).all()
     usuarios_dict = {u.id_usuario: u for u in usuarios}
     titulos_dict = {t.id_titulo: t for t in titulos}
-    return templates.TemplateResponse("rutinas.html", {"request": request, "rutinas": rutinas, "usuarios_dict": usuarios_dict, "titulos_dict": titulos_dict})
+
+    # 4. Generar Calendario del Mes Actual
+    hoy = date.today()
+    cal = calendar.monthcalendar(hoy.year, hoy.month)
+    # cal es una matriz [[0,0,1,2,3...], [4,5,6...]]
+    
+    # Nombres de meses en español
+    meses = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+    nombre_mes = f"{meses[hoy.month]} De {hoy.year}"
+
+    return templates.TemplateResponse("rutinas.html", {
+        "request": request, 
+        "calendar_weeks": cal, # La matriz de semanas
+        "rutinas_map": rutinas_map, # Las rutinas organizadas
+        "usuarios_dict": usuarios_dict, 
+        "titulos_dict": titulos_dict,
+        "year": hoy.year,
+        "month": hoy.month,
+        "nombre_mes": nombre_mes,
+        "hoy_dia": hoy.day # Para resaltar el día actual
+    })
 
 @router.get("/rutinas/crear", response_class=HTMLResponse)
-async def pagina_crear_rutina(request: Request, session: Session = Depends(get_session)):
+async def pagina_crear_rutina(request: Request, fecha_preseleccionada: Optional[str] = None, session: Session = Depends(get_session)):
     usuarios = session.exec(select(Usuario).where(Usuario.is_active == True)).all()
     titulos = session.exec(select(PeliculaSerie).where(PeliculaSerie.is_active == True)).all()
-    return templates.TemplateResponse("rutina_form.html", {"request": request, "accion": "Crear", "rutina": None, "usuarios": usuarios, "titulos": titulos})
+    
+    return templates.TemplateResponse("rutina_form.html", {
+        "request": request, 
+        "accion": "Crear", 
+        "rutina": None, 
+        "usuarios": usuarios, 
+        "titulos": titulos,
+        "fecha_pre": fecha_preseleccionada # Pasamos la fecha si viene del calendario
+    })
 
 @router.post("/rutinas/crear")
 async def crear_rutina_web(nombre: str = Form(...), id_usuario_FK: int = Form(...), id_titulo_FK: int = Form(...), fecha_inicio: str = Form(...), fecha_fin: str = Form(...), session: Session = Depends(get_session)):
@@ -246,6 +264,24 @@ async def crear_rutina_web(nombre: str = Form(...), id_usuario_FK: int = Form(..
     session.add(rutina)
     session.commit()
     return RedirectResponse(url="/web/rutinas?mensaje=Rutina creada", status_code=303)
+
+@router.get("/rutinas/editar/{id_rutina}", response_class=HTMLResponse)
+async def pagina_editar_rutina(id_rutina: int, request: Request, session: Session = Depends(get_session)):
+    rutina = session.get(Rutina, id_rutina)
+    usuarios = session.exec(select(Usuario).where(Usuario.is_active == True)).all()
+    titulos = session.exec(select(PeliculaSerie).where(PeliculaSerie.is_active == True)).all()
+    return templates.TemplateResponse("rutina_form.html", {"request": request, "accion": "Editar", "rutina": rutina, "usuarios": usuarios, "titulos": titulos})
+
+@router.post("/rutinas/editar/{id_rutina}")
+async def editar_rutina_web(id_rutina: int, nombre: str = Form(...), id_usuario_FK: int = Form(...), id_titulo_FK: int = Form(...), fecha_inicio: str = Form(...), fecha_fin: str = Form(...), session: Session = Depends(get_session)):
+    rutina = session.get(Rutina, id_rutina)
+    rutina.nombre = nombre
+    rutina.id_usuario_FK = id_usuario_FK
+    rutina.id_titulo_FK = id_titulo_FK
+    rutina.fecha_inicio = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+    rutina.fecha_fin = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+    session.commit()
+    return RedirectResponse(url="/web/rutinas?mensaje=Rutina actualizada", status_code=303)
 
 @router.get("/rutinas/eliminar/{id_rutina}")
 async def eliminar_rutina_web(id_rutina: int, session: Session = Depends(get_session)):

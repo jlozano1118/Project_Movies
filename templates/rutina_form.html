@@ -57,12 +57,12 @@
                 <div class="form-group">
                     <label><i class="fas fa-calendar-day"></i> Fecha Inicio:</label>
                     <input type="date" name="fecha_inicio"
-                           value="{% if rutina %}{{ rutina.fecha_inicio }}{% endif %}" required>
+                           value="{% if rutina %}{{ rutina.fecha_inicio }}{% elif fecha_pre %}{{ fecha_pre }}{% endif %}" required>
                 </div>
                 <div class="form-group">
                     <label><i class="fas fa-calendar-check"></i> Fecha Fin:</label>
                     <input type="date" name="fecha_fin"
-                           value="{% if rutina %}{{ rutina.fecha_fin }}{% endif %}" required>
+                           value="{% if rutina %}{{ rutina.fecha_fin }}{% elif fecha_pre %}{{ fecha_pre }}{% endif %}" required>
                 </div>
             </div>
 

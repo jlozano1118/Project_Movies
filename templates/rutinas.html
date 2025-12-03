@@ -1,13 +1,28 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
-{% block title %}Rutinas - CineHub{% endblock %}
+{% block title %}Planeador - CineHub{% endblock %}
 
 {% block content %}
 <div class="container">
-    <div class="page-header">
-        <h1><i class="fas fa-calendar-alt"></i> Gestión de Rutinas</h1>
-        <a href="/rutinas/web/crear" class="btn btn-success">
-            <i class="fas fa-plus"></i> Nueva Rutina
+    
+    <div class="planner-header">
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <a href="?year={{ prev_year }}&month={{ prev_month }}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-chevron-left"></i>
+            </a>
+            
+            <div>
+                <div style="font-size: 0.9rem; color: #aaa;">PLANEADOR SEMANAL</div>
+                <div class="month-label">{{ nombre_mes }}</div>
+            </div>
+
+            <a href="?year={{ next_year }}&month={{ next_month }}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-chevron-right"></i>
+            </a>
+        </div>
+
+        <a href="/web/rutinas/crear" class="btn btn-success">
+            <i class="fas fa-plus"></i> Programar Maratón
         </a>
     </div>
 
@@ -18,48 +33,65 @@
     </div>
     {% endif %}
 
-    <div class="table-container">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Nombre</th>
-                    <th>Usuario</th>
-                    <th>Título</th>
-                    <th>Fecha Inicio</th>
-                    <th>Fecha Fin</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if rutinas %}
-                    {% for rutina in rutinas %}
-                    <tr>
-                        <td>{{ rutina.id_rutina }}</td>
-                        <td>{{ rutina.nombre }}</td>
-                        <td>{{ usuarios_dict.get(rutina.id_usuario_FK).nombre if usuarios_dict.get(rutina.id_usuario_FK) else 'N/A' }}</td>
-                        <td>{{ titulos_dict.get(rutina.id_titulo_FK).titulo if titulos_dict.get(rutina.id_titulo_FK) else 'N/A' }}</td>
-                        <td>{{ rutina.fecha_inicio }}</td>
-                        <td>{{ rutina.fecha_fin }}</td>
-                        <td class="actions-cell">
-                            <a href="/rutinas/web/editar/{{ rutina.id_rutina }}" class="btn btn-warning btn-sm">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            <a href="/rutinas/web/eliminar/{{ rutina.id_rutina }}"
-                               class="btn btn-danger btn-sm"
-                               onclick="return confirm('¿Estás seguro de eliminar esta rutina?')">
-                                <i class="fas fa-trash"></i>
-                            </a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                {% else %}
-                    <tr>
-                        <td colspan="7" class="loading">No hay rutinas registradas</td>
-                    </tr>
-                {% endif %}
-            </tbody>
-        </table>
-    </div>
+    {% for semana in calendar_weeks %}
+        {% set hay_dias = false %}
+        {% for dia in semana %}{% if dia != 0 %}{% set hay_dias = true %}{% endif %}{% endfor %}
+        
+        {% if hay_dias %}
+        <div class="week-section">
+            <div class="week-badge">Semana {{ loop.index }}</div>
+
+            <div class="days-grid">
+                {% for dia in semana %}
+                    {% if dia == 0 %}
+                        <div class="day-card" style="opacity: 0.1; border: none; background: transparent;"></div>
+                    {% else %}
+                        {% set fecha_key = year ~ "-" ~ "%02d"|format(month) ~ "-" ~ "%02d"|format(dia) %}
+                        {% set rutinas_hoy = rutinas_map.get(fecha_key, []) %}
+                        
+                        <div class="day-card {% if rutinas_hoy %}has-routine{% endif %}">
+                            <div class="day-header">
+                                <span class="day-name">
+                                    {% set dias_sem = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"] %}
+                                    {{ dias_sem[loop.index0] }}
+                                </span>
+                                {{ dia }}
+                            </div>
+
+                            <div class="day-content">
+                                {% if rutinas_hoy %}
+                                    {% for r in rutinas_hoy %}
+                                    <div class="routine-item">
+                                        <span class="routine-title" title="{{ titulos_dict.get(r.id_titulo_FK).titulo }}">
+                                            <i class="fas fa-film"></i> {{ titulos_dict.get(r.id_titulo_FK).titulo }}
+                                        </span>
+                                        <div style="font-size: 0.75rem; color: #aaa;">
+                                            <i class="fas fa-user"></i> {{ usuarios_dict.get(r.id_usuario_FK).nombre }}
+                                        </div>
+                                        <div class="routine-actions">
+                                            <a href="/web/rutinas/editar/{{ r.id_rutina }}" style="color: var(--warning);"><i class="fas fa-pen"></i></a>
+                                            <a href="/web/rutinas/eliminar/{{ r.id_rutina }}" style="color: var(--danger);" onclick="return confirm('¿Borrar?')"><i class="fas fa-times"></i></a>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div style="text-align: center; color: #444; margin-top: 20px;">
+                                        <i class="fas fa-couch" style="font-size: 1.5rem;"></i>
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <div style="margin-top: auto;">
+                                <a href="/web/rutinas/crear?fecha_preseleccionada={{ fecha_key }}" class="btn-add-mini">
+                                    <i class="fas fa-plus"></i>
+                                </a>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    {% endfor %}
 </div>
 {% endblock %}

@@ -569,3 +569,247 @@ select option {
     color: #f5f5f1; /* Texto claro */
     padding: 10px;
 }
+
+/* --- PLANEADOR SEMANAL (RUTINAS) --- */
+.planner-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.month-label {
+    font-size: 1.5rem;
+    color: var(--gray);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.week-section {
+    margin-bottom: 3rem;
+}
+
+.week-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    font-weight: bold;
+    color: var(--success);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+}
+
+.week-number {
+    background: var(--success);
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+}
+
+.days-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1.5rem;
+}
+
+.day-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 2px dashed #444; /* Borde punteado por defecto */
+    border-radius: 15px;
+    padding: 1.5rem;
+    text-align: center;
+    transition: all 0.3s ease;
+    min-height: 160px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+}
+
+.day-card:hover {
+    border-color: var(--primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.day-card.has-routine {
+    border: 2px solid var(--primary); /* Borde solido si hay rutina */
+    background: rgba(229, 9, 20, 0.1);
+}
+
+.day-date {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--light);
+    margin-bottom: 1rem;
+}
+
+.routine-info {
+    font-size: 0.9rem;
+    color: #ccc;
+    margin-bottom: 0.5rem;
+}
+
+.btn-plan {
+    color: var(--gray);
+    text-decoration: none;
+    font-size: 0.9rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    transition: color 0.3s;
+}
+
+.btn-plan:hover {
+    color: var(--primary);
+}
+
+.btn-plan i {
+    font-size: 1.5rem;
+}
+
+.card-actions {
+    display: flex;
+    gap: 5px;
+    margin-top: 10px;
+}
+
+/* --- ESTILOS DEL PLANEADOR (CALENDARIO) --- */
+
+.planner-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    background: rgba(0,0,0,0.2);
+    padding: 20px;
+    border-radius: 15px;
+}
+
+.month-label {
+    font-size: 1.8rem;
+    color: var(--primary);
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.week-section {
+    margin-bottom: 3rem;
+}
+
+.week-badge {
+    background: #333;
+    color: white;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    margin-bottom: 15px;
+    display: inline-block;
+    border: 1px solid #555;
+}
+
+/* LA CUADRÍCULA MÁGICA */
+.days-grid {
+    display: grid;
+    /* Esto crea 7 columnas automáticas (una por día de semana) o se adapta */
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 15px;
+}
+
+/* EL CUADRITO DE CADA DÍA */
+.day-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px dashed #666; 
+    border-radius: 10px;
+    min-height: 180px; /* Altura mínima para que se vean bien */
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.day-card:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--primary);
+    transform: translateY(-5px); /* Efecto de levitar */
+}
+
+/* Cuando el día tiene rutina, se pone borde sólido y rojizo */
+.day-card.has-routine {
+    border: 1px solid var(--primary);
+    background: rgba(229, 9, 20, 0.05);
+    box-shadow: 0 4px 15px rgba(229, 9, 20, 0.2);
+}
+
+.day-header {
+    text-align: right;
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #ccc;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 5px;
+    margin-bottom: 10px;
+}
+
+.day-name {
+    font-size: 0.8rem;
+    color: #888;
+    float: left;
+    text-transform: uppercase;
+    margin-top: 5px;
+}
+
+/* La película dentro del cuadrito */
+.routine-item {
+    background: rgba(0,0,0,0.5);
+    border-radius: 5px;
+    padding: 8px;
+    margin-bottom: 5px;
+    font-size: 0.85rem;
+    border-left: 3px solid var(--warning);
+}
+
+.routine-title {
+    color: var(--warning);
+    font-weight: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+}
+
+.routine-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 5px;
+    margin-top: 5px;
+}
+
+.btn-add-mini {
+    width: 100%;
+    text-align: center;
+    padding: 5px;
+    border: 1px dashed #555;
+    border-radius: 5px;
+    color: #777;
+    font-size: 0.8rem;
+    cursor: pointer;
+    text-decoration: none;
+    transition: 0.2s;
+}
+
+.btn-add-mini:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
