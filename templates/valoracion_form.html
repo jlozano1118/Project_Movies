@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}{{ accion }} Valoración - CineHub{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="form-container">
+        <div class="form-header">
+            <h1>
+                <i class="fas fa-star"></i>
+                {{ accion }} Valoración
+            </h1>
+            <a href="/valoraciones/web" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+        </div>
+
+        <form method="post" class="data-form">
+            <div class="form-group">
+                <label><i class="fas fa-user"></i> Usuario:</label>
+                <select name="id_usuario_FK" required {% if accion == 'Editar' %}disabled{% endif %}>
+                    <option value="">Seleccione un usuario</option>
+                    {% for usuario in usuarios %}
+                    <option value="{{ usuario.id_usuario }}"
+                            {% if valoracion and valoracion.id_usuario_FK == usuario.id_usuario %}selected{% endif %}>
+                        {{ usuario.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% if accion == 'Editar' %}
+                <input type="hidden" name="id_usuario_FK" value="{{ valoracion.id_usuario_FK }}">
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-film"></i> Título:</label>
+                <select name="id_titulo_FK" required {% if accion == 'Editar' %}disabled{% endif %}>
+                    <option value="">Seleccione un título</option>
+                    {% for titulo in titulos %}
+                    <option value="{{ titulo.id_titulo }}"
+                            {% if valoracion and valoracion.id_titulo_FK == titulo.id_titulo %}selected{% endif %}>
+                        {{ titulo.titulo }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% if accion == 'Editar' %}
+                <input type="hidden" name="id_titulo_FK" value="{{ valoracion.id_titulo_FK }}">
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-star"></i> Puntuación (0-10):</label>
+                <input type="number" name="puntuacion"
+                       value="{% if valoracion %}{{ valoracion.puntuacion }}{% endif %}"
+                       min="0" max="10" step="0.1" required>
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-comment"></i> Comentario:</label>
+                <textarea name="comentario" rows="4" required>{% if valoracion %}{{ valoracion.comentario }}{% endif %}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-calendar"></i> Fecha:</label>
+                <input type="date" name="fecha"
+                       value="{% if valoracion %}{{ valoracion.fecha }}{% endif %}" required>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn {% if accion == 'Crear' %}btn-success{% else %}btn-primary{% endif %}">
+                    <i class="fas fa-save"></i> {{ accion }}
+                </button>
+                <a href="/valoraciones/web" class="btn btn-secondary">Cancelar</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

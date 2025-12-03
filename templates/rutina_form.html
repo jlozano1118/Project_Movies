@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}{{ accion }} Rutina - CineHub{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="form-container">
+        <div class="form-header">
+            <h1>
+                <i class="fas fa-calendar-alt"></i>
+                {{ accion }} Rutina
+            </h1>
+            <a href="/rutinas/web" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+        </div>
+
+        <form method="post" class="data-form">
+            <div class="form-group">
+                <label><i class="fas fa-heading"></i> Nombre de la Rutina:</label>
+                <input type="text" name="nombre" value="{% if rutina %}{{ rutina.nombre }}{% endif %}" required>
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-user"></i> Usuario:</label>
+                <select name="id_usuario_FK" required {% if accion == 'Editar' %}disabled{% endif %}>
+                    <option value="">Seleccione un usuario</option>
+                    {% for usuario in usuarios %}
+                    <option value="{{ usuario.id_usuario }}"
+                            {% if rutina and rutina.id_usuario_FK == usuario.id_usuario %}selected{% endif %}>
+                        {{ usuario.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% if accion == 'Editar' %}
+                <input type="hidden" name="id_usuario_FK" value="{{ rutina.id_usuario_FK }}">
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-film"></i> Título:</label>
+                <select name="id_titulo_FK" required {% if accion == 'Editar' %}disabled{% endif %}>
+                    <option value="">Seleccione un título</option>
+                    {% for titulo in titulos %}
+                    <option value="{{ titulo.id_titulo }}"
+                            {% if rutina and rutina.id_titulo_FK == titulo.id_titulo %}selected{% endif %}>
+                        {{ titulo.titulo }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% if accion == 'Editar' %}
+                <input type="hidden" name="id_titulo_FK" value="{{ rutina.id_titulo_FK }}">
+                {% endif %}
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label><i class="fas fa-calendar-day"></i> Fecha Inicio:</label>
+                    <input type="date" name="fecha_inicio"
+                           value="{% if rutina %}{{ rutina.fecha_inicio }}{% endif %}" required>
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-calendar-check"></i> Fecha Fin:</label>
+                    <input type="date" name="fecha_fin"
+                           value="{% if rutina %}{{ rutina.fecha_fin }}{% endif %}" required>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn {% if accion == 'Crear' %}btn-success{% else %}btn-primary{% endif %}">
+                    <i class="fas fa-save"></i> {{ accion }}
+                </button>
+                <a href="/rutinas/web" class="btn btn-secondary">Cancelar</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

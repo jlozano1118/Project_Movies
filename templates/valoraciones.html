@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Valoraciones - CineHub{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-star"></i> Gestión de Valoraciones</h1>
+        <a href="/valoraciones/web/crear" class="btn btn-success">
+            <i class="fas fa-plus"></i> Nueva Valoración
+        </a>
+    </div>
+
+    {% if request.query_params.get('mensaje') %}
+    <div class="alert alert-success">
+        <i class="fas fa-check-circle"></i>
+        {{ request.query_params.get('mensaje') }}
+    </div>
+    {% endif %}
+
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Usuario</th>
+                    <th>Título</th>
+                    <th>Puntuación</th>
+                    <th>Comentario</th>
+                    <th>Fecha</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if valoraciones %}
+                    {% for valoracion in valoraciones %}
+                    <tr>
+                        <td>{{ valoracion.id_valoracion }}</td>
+                        <td>{{ usuarios_dict.get(valoracion.id_usuario_FK).nombre if usuarios_dict.get(valoracion.id_usuario_FK) else 'N/A' }}</td>
+                        <td>{{ titulos_dict.get(valoracion.id_titulo_FK).titulo if titulos_dict.get(valoracion.id_titulo_FK) else 'N/A' }}</td>
+                        <td>
+                            <span class="badge badge-active">
+                                <i class="fas fa-star"></i> {{ valoracion.puntuacion }}/10
+                            </span>
+                        </td>
+                        <td>{{ valoracion.comentario[:50] }}{% if valoracion.comentario|length > 50 %}...{% endif %}</td>
+                        <td>{{ valoracion.fecha }}</td>
+                        <td class="actions-cell">
+                            <a href="/valoraciones/web/editar/{{ valoracion.id_valoracion }}" class="btn btn-warning btn-sm">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="/valoraciones/web/eliminar/{{ valoracion.id_valoracion }}"
+                               class="btn btn-danger btn-sm"
+                               onclick="return confirm('¿Estás seguro de eliminar esta valoración?')">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="7" class="loading">No hay valoraciones registradas</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

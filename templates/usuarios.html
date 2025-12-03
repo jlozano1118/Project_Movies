@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Usuarios - CineHub{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-users"></i> Gestión de Usuarios</h1>
+        <a href="/web/usuarios/crear" class="btn btn-success">
+            <i class="fas fa-plus"></i> Nuevo Usuario
+        </a>
+    </div>
+
+    {% if request.query_params.get('mensaje') %}
+    <div class="alert alert-success">
+        <i class="fas fa-check-circle"></i>
+        {{ request.query_params.get('mensaje') }}
+    </div>
+    {% endif %}
+
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nombre</th>
+                    <th>Correo</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if usuarios %}
+                    {% for usuario in usuarios %}
+                    <tr>
+                        <td>{{ usuario.id_usuario }}</td>
+                        <td>{{ usuario.nombre }}</td>
+                        <td>{{ usuario.correo }}</td>
+                        <td>
+                            <span class="badge {% if usuario.is_active %}badge-active{% else %}badge-inactive{% endif %}">
+                                {% if usuario.is_active %}Activo{% else %}Inactivo{% endif %}
+                            </span>
+                        </td>
+                        <td class="actions-cell">
+                            <a href="/web/usuarios/editar/{{ usuario.id_usuario }}" class="btn btn-warning btn-sm">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="/web/usuarios/eliminar/{{ usuario.id_usuario }}"
+                               class="btn btn-danger btn-sm"
+                               onclick="return confirm('¿Estás seguro de eliminar este usuario?')">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="5" class="loading">No hay usuarios registrados</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

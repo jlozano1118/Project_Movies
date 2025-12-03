@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="hero-section">
+    <div class="hero-content">
+        <h1 class="hero-title">
+            <i class="fas fa-film"></i>
+            Bienvenido a CineHub
+        </h1>
+        <p class="hero-subtitle">Tu plataforma completa para gestionar películas, series y valoraciones</p>
+    </div>
+</div>
+
+<div class="container">
+    <div class="cards-grid">
+        <div class="feature-card">
+            <div class="card-icon usuarios">
+                <i class="fas fa-users"></i>
+            </div>
+            <h3>Usuarios</h3>
+            <p>Gestiona todos los usuarios de la plataforma</p>
+            <a href="/usuarios/web" class="btn btn-primary">Ver Usuarios</a>
+        </div>
+
+        <div class="feature-card">
+            <div class="card-icon titulos">
+                <i class="fas fa-video"></i>
+            </div>
+            <h3>Películas y Series</h3>
+            <p>Administra el catálogo completo de contenido</p>
+            <a href="/titulos/web" class="btn btn-primary">Ver Catálogo</a>
+        </div>
+
+        <div class="feature-card">
+            <div class="card-icon valoraciones">
+                <i class="fas fa-star"></i>
+            </div>
+            <h3>Valoraciones</h3>
+            <p>Revisa las valoraciones y comentarios</p>
+            <a href="/valoraciones/web" class="btn btn-primary">Ver Valoraciones</a>
+        </div>
+
+        <div class="feature-card">
+            <div class="card-icon rutinas">
+                <i class="fas fa-calendar-alt"></i>
+            </div>
+            <h3>Rutinas</h3>
+            <p>Organiza las rutinas de visualización</p>
+            <a href="/rutinas/web" class="btn btn-primary">Ver Rutinas</a>
+        </div>
+    </div>
+
+    <div class="info-section">
+        <h2>Características Principales</h2>
+        <div class="features-list">
+            <div class="feature-item">
+                <i class="fas fa-check-circle"></i>
+                <span>Gestión completa de usuarios y perfiles</span>
+            </div>
+            <div class="feature-item">
+                <i class="fas fa-check-circle"></i>
+                <span>Catálogo extenso de películas y series</span>
+            </div>
+            <div class="feature-item">
+                <i class="fas fa-check-circle"></i>
+                <span>Sistema de valoraciones y reseñas</span>
+            </div>
+            <div class="feature-item">
+                <i class="fas fa-check-circle"></i>
+                <span>Planificación de rutinas de visualización</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

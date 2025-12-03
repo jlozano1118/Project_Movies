@@ -6,7 +6,7 @@ from utils.db import get_session
 from data.models import Usuario, UsuarioCreate
 
 router = APIRouter(
-    prefix="/usuarios",
+    prefix="/web/usuarios",
     tags=["Usuarios"]
 )
 

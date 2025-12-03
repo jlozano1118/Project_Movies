@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Películas y Series - CineHub{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="fas fa-video"></i> Catálogo de Películas y Series</h1>
+        <a href="/titulos/web/crear" class="btn btn-success">
+            <i class="fas fa-plus"></i> Nuevo Título
+        </a>
+    </div>
+
+    {% if request.query_params.get('mensaje') %}
+    <div class="alert alert-success">
+        <i class="fas fa-check-circle"></i>
+        {{ request.query_params.get('mensaje') }}
+    </div>
+    {% endif %}
+
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Título</th>
+                    <th>Género</th>
+                    <th>Año</th>
+                    <th>Duración (min)</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if titulos %}
+                    {% for titulo in titulos %}
+                    <tr>
+                        <td>{{ titulo.id_titulo }}</td>
+                        <td>{{ titulo.titulo }}</td>
+                        <td>{{ titulo.genero }}</td>
+                        <td>{{ titulo.anio_estreno }}</td>
+                        <td>{{ titulo.duracion }}</td>
+                        <td>
+                            <span class="badge {% if titulo.is_active %}badge-active{% else %}badge-inactive{% endif %}">
+                                {% if titulo.is_active %}Activo{% else %}Inactivo{% endif %}
+                            </span>
+                        </td>
+                        <td class="actions-cell">
+                            <a href="/titulos/web/editar/{{ titulo.id_titulo }}" class="btn btn-warning btn-sm">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="/titulos/web/eliminar/{{ titulo.id_titulo }}"
+                               class="btn btn-danger btn-sm"
+                               onclick="return confirm('¿Estás seguro de eliminar este título?')">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="7" class="loading">No hay títulos registrados</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
