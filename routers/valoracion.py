@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+﻿from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List
 from datetime import datetime
@@ -11,7 +11,7 @@ router = APIRouter(
 )
 
 
-@router.post("/", response_model=Valoracion, summary="Crear una nueva valoración")
+@router.post("/", response_model=Valoracion, summary="Crear una nueva valoraciÃ³n")
 def crear_valoracion(valoracion: ValoracionCreate, session: Session = Depends(get_session)):
     usuario = session.get(Usuario, valoracion.id_usuario_FK)
     titulo = session.get(PeliculaSerie, valoracion.id_titulo_FK)
@@ -19,7 +19,7 @@ def crear_valoracion(valoracion: ValoracionCreate, session: Session = Depends(ge
     if not usuario or not usuario.is_active:
         raise HTTPException(status_code=404, detail=f"Usuario con ID {valoracion.id_usuario_FK} no encontrado o inactivo")
     if not titulo or not titulo.is_active:
-        raise HTTPException(status_code=404, detail=f"Título con ID {valoracion.id_titulo_FK} no encontrado o inactivo")
+        raise HTTPException(status_code=404, detail=f"TÃ­tulo con ID {valoracion.id_titulo_FK} no encontrado o inactivo")
 
     valoracion_obj = Valoracion(**valoracion.dict())
     session.add(valoracion_obj)
@@ -40,27 +40,27 @@ def listar_valoraciones_eliminadas(session: Session = Depends(get_session)):
     return eliminadas or []
 
 
-@router.get("/comentario/{comentario}", response_model=Valoracion, summary="Obtener valoración por comentario")
+@router.get("/comentario/{comentario}", response_model=Valoracion, summary="Obtener valoraciÃ³n por comentario")
 def buscar_valoracion_por_comentario(comentario: str, session: Session = Depends(get_session)):
     valoracion = session.exec(select(Valoracion).where(Valoracion.comentario == comentario, Valoracion.is_active == True)).first()
     if not valoracion:
-        raise HTTPException(status_code=404, detail=f"No se encontró la valoración con comentario '{comentario}'")
+        raise HTTPException(status_code=404, detail=f"No se encontrÃ³ la valoraciÃ³n con comentario '{comentario}'")
     return valoracion
 
 
-@router.get("/{id_valoracion}", response_model=Valoracion, summary="Obtener valoración por ID")
+@router.get("/{id_valoracion}", response_model=Valoracion, summary="Obtener valoraciÃ³n por ID")
 def ver_valoracion(id_valoracion: int, session: Session = Depends(get_session)):
     valoracion = session.get(Valoracion, id_valoracion)
     if not valoracion or not valoracion.is_active:
-        raise HTTPException(status_code=404, detail=f"Valoración con ID {id_valoracion} no encontrada o inactiva")
+        raise HTTPException(status_code=404, detail=f"ValoraciÃ³n con ID {id_valoracion} no encontrada o inactiva")
     return valoracion
 
 
-@router.put("/{id_valoracion}", response_model=Valoracion, summary="Actualizar una valoración")
+@router.put("/{id_valoracion}", response_model=Valoracion, summary="Actualizar una valoraciÃ³n")
 def actualizar_valoracion(id_valoracion: int, datos: ValoracionCreate, session: Session = Depends(get_session)):
     valoracion = session.get(Valoracion, id_valoracion)
     if not valoracion or not valoracion.is_active:
-        raise HTTPException(status_code=404, detail=f"Valoración con ID {id_valoracion} no encontrada o inactiva")
+        raise HTTPException(status_code=404, detail=f"ValoraciÃ³n con ID {id_valoracion} no encontrada o inactiva")
 
     valoracion.puntuacion = datos.puntuacion
     valoracion.comentario = datos.comentario
@@ -71,12 +71,12 @@ def actualizar_valoracion(id_valoracion: int, datos: ValoracionCreate, session: 
     return valoracion
 
 
-@router.delete("/{id_valoracion}", response_model=dict, summary="Eliminar una valoración (lógico)")
+@router.delete("/{id_valoracion}", response_model=dict, summary="Eliminar una valoraciÃ³n (lÃ³gico)")
 def eliminar_valoracion(id_valoracion: int, session: Session = Depends(get_session)):
     valoracion = session.get(Valoracion, id_valoracion)
     if not valoracion:
-        raise HTTPException(status_code=404, detail=f"Valoración con ID {id_valoracion} no encontrada")
+        raise HTTPException(status_code=404, detail=f"ValoraciÃ³n con ID {id_valoracion} no encontrada")
     valoracion.is_active = False
     valoracion.deleted_at = datetime.now()
     session.commit()
-    return {"mensaje": f"Valoración con ID {id_valoracion} desactivada correctamente"}
+    return {"mensaje": f"ValoraciÃ³n con ID {id_valoracion} desactivada correctamente"}

@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block title %}Valoraciones - CineHub{% endblock %}
 
@@ -6,7 +6,7 @@
 <div class="container">
     <div class="page-header">
         <h1><i class="fas fa-star"></i> Gestión de Valoraciones</h1>
-        <a href="/valoraciones/web/crear" class="btn btn-success">
+        <a href="/web/valoraciones/crear" class="btn btn-success">
             <i class="fas fa-plus"></i> Nueva Valoración
         </a>
     </div>
@@ -18,52 +18,137 @@
     </div>
     {% endif %}
 
-    <div class="table-container">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Usuario</th>
-                    <th>Título</th>
-                    <th>Puntuación</th>
-                    <th>Comentario</th>
-                    <th>Fecha</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if valoraciones %}
-                    {% for valoracion in valoraciones %}
+    <div style="margin-bottom: 20px; display: flex; gap: 10px;">
+        <button onclick="cambiarVista('activos')" id="btn-activos" class="btn btn-primary">
+            <i class="fas fa-star"></i> Valoraciones Activas
+        </button>
+        <button onclick="cambiarVista('inactivos')" id="btn-inactivos" class="btn btn-secondary">
+            <i class="fas fa-trash-alt"></i> Papelera
+        </button>
+    </div>
+
+    <div id="vista-activos">
+        <div class="table-container">
+            <h3><i class="fas fa-comments"></i> Reseñas Publicadas</h3>
+            <table class="data-table">
+                <thead>
                     <tr>
-                        <td>{{ valoracion.id_valoracion }}</td>
-                        <td>{{ usuarios_dict.get(valoracion.id_usuario_FK).nombre if usuarios_dict.get(valoracion.id_usuario_FK) else 'N/A' }}</td>
-                        <td>{{ titulos_dict.get(valoracion.id_titulo_FK).titulo if titulos_dict.get(valoracion.id_titulo_FK) else 'N/A' }}</td>
-                        <td>
-                            <span class="badge badge-active">
-                                <i class="fas fa-star"></i> {{ valoracion.puntuacion }}/10
-                            </span>
-                        </td>
-                        <td>{{ valoracion.comentario[:50] }}{% if valoracion.comentario|length > 50 %}...{% endif %}</td>
-                        <td>{{ valoracion.fecha }}</td>
-                        <td class="actions-cell">
-                            <a href="/valoraciones/web/editar/{{ valoracion.id_valoracion }}" class="btn btn-warning btn-sm">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            <a href="/valoraciones/web/eliminar/{{ valoracion.id_valoracion }}"
-                               class="btn btn-danger btn-sm"
-                               onclick="return confirm('¿Estás seguro de eliminar esta valoración?')">
-                                <i class="fas fa-trash"></i>
-                            </a>
-                        </td>
+                        <th>ID</th>
+                        <th>Usuario</th>
+                        <th>Título</th>
+                        <th>Puntuación</th>
+                        <th>Comentario</th>
+                        <th>Fecha</th>
+                        <th>Acciones</th>
                     </tr>
-                    {% endfor %}
-                {% else %}
+                </thead>
+                <tbody>
+                    {% if valoraciones_activas %}
+                        {% for valoracion in valoraciones_activas %}
+                        <tr>
+                            <td>{{ valoracion.id_valoracion }}</td>
+                            <td>{{ usuarios_dict.get(valoracion.id_usuario_FK).nombre if usuarios_dict.get(valoracion.id_usuario_FK) else 'N/A' }}</td>
+                            <td>{{ titulos_dict.get(valoracion.id_titulo_FK).titulo if titulos_dict.get(valoracion.id_titulo_FK) else 'N/A' }}</td>
+                            <td>
+                                <span class="badge badge-active">
+                                    <i class="fas fa-star"></i> {{ valoracion.puntuacion }}/10
+                                </span>
+                            </td>
+                            <td>{{ valoracion.comentario[:50] }}{% if valoracion.comentario|length > 50 %}...{% endif %}</td>
+                            <td>{{ valoracion.fecha }}</td>
+                            <td class="actions-cell">
+                                <a href="/web/valoraciones/editar/{{ valoracion.id_valoracion }}" class="btn btn-warning btn-sm">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="/web/valoraciones/eliminar/{{ valoracion.id_valoracion }}"
+                                   class="btn btn-danger btn-sm"
+                                   onclick="return confirm('¿Estás seguro de eliminar esta valoración?')">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="loading">No hay valoraciones activas</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="vista-inactivos" style="display: none;">
+        <div class="table-container" style="background: rgba(40, 40, 40, 0.6); border: 1px solid #444;">
+            <h3 style="color: #ccc;"><i class="fas fa-archive"></i> Valoraciones Eliminadas</h3>
+            <table class="data-table">
+                <thead>
                     <tr>
-                        <td colspan="7" class="loading">No hay valoraciones registradas</td>
+                        <th>ID</th>
+                        <th>Usuario</th>
+                        <th>Título</th>
+                        <th>Puntuación</th>
+                        <th>Comentario</th>
+                        <th>Fecha</th>
+                        <th>Acciones</th>
                     </tr>
-                {% endif %}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    {% if valoraciones_inactivas %}
+                        {% for valoracion in valoraciones_inactivas %}
+                        <tr>
+                            <td>{{ valoracion.id_valoracion }}</td>
+                            <td>{{ usuarios_dict.get(valoracion.id_usuario_FK).nombre if usuarios_dict.get(valoracion.id_usuario_FK) else 'N/A' }}</td>
+                            <td>{{ titulos_dict.get(valoracion.id_titulo_FK).titulo if titulos_dict.get(valoracion.id_titulo_FK) else 'N/A' }}</td>
+                            <td>
+                                <span class="badge badge-inactive">
+                                    <i class="fas fa-star"></i> {{ valoracion.puntuacion }}/10
+                                </span>
+                            </td>
+                            <td>{{ valoracion.comentario[:50] }}...</td>
+                            <td>{{ valoracion.fecha }}</td>
+                            <td class="actions-cell">
+                                <a href="/web/valoraciones/restaurar/{{ valoracion.id_valoracion }}" 
+                                   class="btn btn-success btn-sm"
+                                   onclick="return confirm('¿Deseas restaurar esta valoración?')">
+                                    <i class="fas fa-undo"></i> Restaurar
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="loading">La papelera está vacía</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
+
+<script>
+    function cambiarVista(vista) {
+        const divActivos = document.getElementById('vista-activos');
+        const divInactivos = document.getElementById('vista-inactivos');
+        const btnActivos = document.getElementById('btn-activos');
+        const btnInactivos = document.getElementById('btn-inactivos');
+
+        if (vista === 'activos') {
+            divActivos.style.display = 'block';
+            divInactivos.style.display = 'none';
+            btnActivos.classList.remove('btn-secondary');
+            btnActivos.classList.add('btn-primary');
+            btnInactivos.classList.remove('btn-primary');
+            btnInactivos.classList.add('btn-secondary');
+        } else {
+            divActivos.style.display = 'none';
+            divInactivos.style.display = 'block';
+            btnActivos.classList.remove('btn-primary');
+            btnActivos.classList.add('btn-secondary');
+            btnInactivos.classList.remove('btn-secondary');
+            btnInactivos.classList.add('btn-primary');
+        }
+    }
+</script>
 {% endblock %}

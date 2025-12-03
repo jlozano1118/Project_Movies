@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block content %}
 <div class="hero-section">
@@ -18,8 +18,8 @@
                 <i class="fas fa-users"></i>
             </div>
             <h3>Usuarios</h3>
-            <p>Gestiona todos los usuarios de la plataforma</p>
-            <a href="/usuarios/web" class="btn btn-primary">Ver Usuarios</a>
+            <p>Gestiona los {{ n_usuarios }} usuarios registrados</p>
+            <a href="/web/usuarios" class="btn btn-primary">Ver Usuarios</a>
         </div>
 
         <div class="feature-card">
@@ -27,8 +27,8 @@
                 <i class="fas fa-video"></i>
             </div>
             <h3>Películas y Series</h3>
-            <p>Administra el catálogo completo de contenido</p>
-            <a href="/titulos/web" class="btn btn-primary">Ver Catálogo</a>
+            <p>Explora los {{ n_titulos }} títulos del catálogo</p>
+            <a href="/web/titulos" class="btn btn-primary">Ver Catálogo</a>
         </div>
 
         <div class="feature-card">
@@ -36,8 +36,8 @@
                 <i class="fas fa-star"></i>
             </div>
             <h3>Valoraciones</h3>
-            <p>Revisa las valoraciones y comentarios</p>
-            <a href="/valoraciones/web" class="btn btn-primary">Ver Valoraciones</a>
+            <p>{{ n_valoraciones }} reseñas realizadas</p>
+            <a href="/web/valoraciones" class="btn btn-primary">Ver Valoraciones</a>
         </div>
 
         <div class="feature-card">
@@ -45,8 +45,8 @@
                 <i class="fas fa-calendar-alt"></i>
             </div>
             <h3>Rutinas</h3>
-            <p>Organiza las rutinas de visualización</p>
-            <a href="/rutinas/web" class="btn btn-primary">Ver Rutinas</a>
+            <p>{{ n_rutinas }} maratones programadas</p>
+            <a href="/web/rutinas" class="btn btn-primary">Ver Rutinas</a>
         </div>
     </div>
 

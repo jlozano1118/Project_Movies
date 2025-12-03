@@ -4,3 +4,4 @@ sqlmodel
 python-dotenv
 jinja2
 python-multipart
+passlib[bcrypt]

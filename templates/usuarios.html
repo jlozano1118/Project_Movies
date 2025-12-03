@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block title %}Usuarios - CineHub{% endblock %}
 
@@ -18,48 +18,136 @@
     </div>
     {% endif %}
 
-    <div class="table-container">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Nombre</th>
-                    <th>Correo</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if usuarios %}
-                    {% for usuario in usuarios %}
+    <div style="margin-bottom: 20px; display: flex; gap: 10px;">
+        <button onclick="cambiarVista('activos')" id="btn-activos" class="btn btn-primary">
+            <i class="fas fa-user-check"></i> Usuarios Activos
+        </button>
+        <button onclick="cambiarVista('inactivos')" id="btn-inactivos" class="btn btn-secondary">
+            <i class="fas fa-user-times"></i> Papelera (Inactivos)
+        </button>
+    </div>
+
+    <div id="vista-activos">
+        <div class="table-container">
+            <h3><i class="fas fa-check-circle"></i> Lista de Usuarios Activos</h3>
+            <table class="data-table">
+                <thead>
                     <tr>
-                        <td>{{ usuario.id_usuario }}</td>
-                        <td>{{ usuario.nombre }}</td>
-                        <td>{{ usuario.correo }}</td>
-                        <td>
-                            <span class="badge {% if usuario.is_active %}badge-active{% else %}badge-inactive{% endif %}">
-                                {% if usuario.is_active %}Activo{% else %}Inactivo{% endif %}
-                            </span>
-                        </td>
-                        <td class="actions-cell">
-                            <a href="/web/usuarios/editar/{{ usuario.id_usuario }}" class="btn btn-warning btn-sm">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            <a href="/web/usuarios/eliminar/{{ usuario.id_usuario }}"
-                               class="btn btn-danger btn-sm"
-                               onclick="return confirm('¿Estás seguro de eliminar este usuario?')">
-                                <i class="fas fa-trash"></i>
-                            </a>
-                        </td>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Correo</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
                     </tr>
-                    {% endfor %}
-                {% else %}
+                </thead>
+                <tbody>
+                    {% if usuarios_activos %}
+                        {% for usuario in usuarios_activos %}
+                        <tr>
+                            <td>{{ usuario.id_usuario }}</td>
+                            <td>{{ usuario.nombre }}</td>
+                            <td>{{ usuario.correo }}</td>
+                            <td>
+                                <span class="badge badge-active">Activo</span>
+                            </td>
+                            <td class="actions-cell">
+                                <a href="/web/usuarios/editar/{{ usuario.id_usuario }}" class="btn btn-warning btn-sm">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="/web/usuarios/eliminar/{{ usuario.id_usuario }}"
+                                   class="btn btn-danger btn-sm"
+                                   onclick="return confirm('¿Estás seguro de desactivar este usuario?')">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="loading">No hay usuarios activos</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="vista-inactivos" style="display: none;">
+        <div class="table-container" style="background: rgba(40, 40, 40, 0.6); border: 1px solid #444;">
+            <h3 style="color: #ccc;"><i class="fas fa-trash-alt"></i> Papelera de Reciclaje</h3>
+            <table class="data-table">
+                <thead>
                     <tr>
-                        <td colspan="5" class="loading">No hay usuarios registrados</td>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Correo</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
                     </tr>
-                {% endif %}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    {% if usuarios_inactivos %}
+                        {% for usuario in usuarios_inactivos %}
+                        <tr>
+                            <td>{{ usuario.id_usuario }}</td>
+                            <td>{{ usuario.nombre }}</td>
+                            <td>{{ usuario.correo }}</td>
+                            <td>
+                                <span class="badge badge-inactive">Inactivo</span>
+                            </td>
+                            <td class="actions-cell">
+                                <a href="/web/usuarios/restaurar/{{ usuario.id_usuario }}" 
+                                   class="btn btn-success btn-sm"
+                                   onclick="return confirm('¿Deseas reactivar este usuario?')">
+                                    <i class="fas fa-undo"></i> Restaurar
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="loading">La papelera está vacía</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
+
+<script>
+    function cambiarVista(vista) {
+        // Referencias a las secciones
+        const divActivos = document.getElementById('vista-activos');
+        const divInactivos = document.getElementById('vista-inactivos');
+        
+        // Referencias a los botones
+        const btnActivos = document.getElementById('btn-activos');
+        const btnInactivos = document.getElementById('btn-inactivos');
+
+        if (vista === 'activos') {
+            // Mostrar Activos
+            divActivos.style.display = 'block';
+            divInactivos.style.display = 'none';
+            
+            // Actualizar estilo botones
+            btnActivos.classList.remove('btn-secondary');
+            btnActivos.classList.add('btn-primary');
+            
+            btnInactivos.classList.remove('btn-primary');
+            btnInactivos.classList.add('btn-secondary');
+        } else {
+            // Mostrar Inactivos
+            divActivos.style.display = 'none';
+            divInactivos.style.display = 'block';
+            
+            // Actualizar estilo botones
+            btnActivos.classList.remove('btn-primary');
+            btnActivos.classList.add('btn-secondary');
+            
+            btnInactivos.classList.remove('btn-secondary');
+            btnInactivos.classList.add('btn-primary'); // O un color rojo si prefieres
+        }
+    }
+</script>
 {% endblock %}

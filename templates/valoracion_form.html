@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block title %}{{ accion }} Valoración - CineHub{% endblock %}
 
@@ -10,7 +10,7 @@
                 <i class="fas fa-star"></i>
                 {{ accion }} Valoración
             </h1>
-            <a href="/valoraciones/web" class="btn btn-secondary">
+            <a href="/web/valoraciones" class="btn btn-secondary">
                 <i class="fas fa-arrow-left"></i> Volver
             </a>
         </div>
@@ -70,7 +70,7 @@
                 <button type="submit" class="btn {% if accion == 'Crear' %}btn-success{% else %}btn-primary{% endif %}">
                     <i class="fas fa-save"></i> {{ accion }}
                 </button>
-                <a href="/valoraciones/web" class="btn btn-secondary">Cancelar</a>
+                <a href="/web/valoraciones" class="btn btn-secondary">Cancelar</a>
             </div>
         </form>
     </div>
