@@ -5,78 +5,112 @@
 {% block content %}
 <div class="container">
 
-    <div class="planner-header" style="display: flex; justify-content: space-between; align-items: center; background: #111; padding: 15px; border-radius: 8px; border: 1px solid #333; margin-bottom: 20px;">
-        <div style="display: flex; align-items: center; gap: 15px;">
-            <a href="?year={{ prev_year }}&month={{ prev_month }}" class="btn btn-secondary btn-sm"><i class="fas fa-chevron-left"></i></a>
-            <div style="text-align: center;">
-                <div style="font-size: 0.8rem; color: #888; letter-spacing: 1px;">AGENDA</div>
-                <div style="font-size: 1.5rem; font-weight: bold; color: white;">{{ nombre_mes }}</div>
-            </div>
-            <a href="?year={{ next_year }}&month={{ next_month }}" class="btn btn-secondary btn-sm"><i class="fas fa-chevron-right"></i></a>
-        </div>
-        <a href="/web/rutinas/crear" class="btn btn-success"><i class="fas fa-plus"></i> Nueva Rutina</a>
+    <div class="page-header">
+        <h1><i class="fas fa-calendar-alt"></i> Planeador de Rutinas</h1>
+
     </div>
 
     {% if request.query_params.get("mensaje") %}
-    <div class="alert" style="background: rgba(40, 167, 69, 0.2); border: 1px solid #28a745; color: #fff; padding: 10px; margin-bottom: 20px; border-radius: 5px;">
-        <i class="fas fa-check"></i> {{ request.query_params.get("mensaje") }}
+    <div class="alert alert-success">
+        <i class="fas fa-check-circle"></i> {{ request.query_params.get("mensaje") }}
     </div>
     {% endif %}
 
-    <div class="calendar-container">
-        {% for semana in calendar_weeks %}
-        <div class="week-row" style="margin-bottom: 20px;">
-            <div style="font-size: 0.7rem; color: #555; text-transform: uppercase; margin-bottom: 5px;">Semana {{ loop.index }}</div>
-
-            <div class="days-grid">
-                {% for dia in semana %}
-                    {% if dia == 0 %}
-                        <div class="day-card empty" style="opacity: 0.2; border: 1px dashed #444; background: transparent;"></div>
-                    {% else %}
-                        {% set fecha_key = "%04d-%02d-%02d"|format(year, month, dia) %}
-                        {% set rutinas_hoy = rutinas_map.get(fecha_key, []) %}
-
-                        <div class="day-card" style="{% if dia == hoy_dia %}border-color: #e50914; background: rgba(229,9,20,0.05);{% endif %}">
-
-                            <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 5px; margin-bottom: 5px;">
-                                <span style="font-size: 0.8rem; color: #777;">
-                                    {% set dias_nombres = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"] %}
-                                    {{ dias_nombres[loop.index0] }}
-                                </span>
-                                <span style="font-weight: bold; font-size: 1.1rem;">{{ dia }}</span>
-                            </div>
-
-                           <div style="flex-grow: 1;">
-                                {% for r in rutinas_hoy %}
-                                <div class="routine-pill" style="
-                                    background: rgba(255,255,255,0.1);
-                                    padding: 5px;
-                                    margin-bottom: 4px;
-                                    border-radius: 3px;
-                                    font-size: 0.75rem;
-                                    border-left: 3px solid #e50914; /* Mantener borde rojo */
-                                ">
-                                    <strong style="display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                        {{ titulos_dict[r.id_titulo_FK].titulo if titulos_dict[r.id_titulo_FK] else "..." }}
-                                    </strong>
-
-                                    <div style="text-align: right; margin-top: 3px;">
-                                        <a href="/web/rutinas/editar/{{ r.id_rutina }}" style="color: #ffc107; margin-right: 5px;"><i class="fas fa-pen"></i></a>
-                                        <a href="/web/rutinas/eliminar/{{ r.id_rutina }}" style="color: #dc3545;" onclick="return confirm('¿Borrar?')"><i class="fas fa-times"></i></a>
-                                    </div>
-                                    </div>
-                                {% endfor %}
-                            </div>
-
-                            <a href="/web/rutinas/crear?fecha_preseleccionada={{ fecha_key }}" style="margin-top: auto; display: block; text-align: center; color: #555; font-size: 0.8rem;">
-                                <i class="fas fa-plus"></i>
-                            </a>
-                        </div>
-                    {% endif %}
-                {% endfor %}
+    <div class="planner-header" style="background: #221f1f; padding: 20px; border-radius: 8px; border: 1px solid #333; margin-bottom: 20px;">
+        <form method="get" id="user-select-form">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label for="id_usuario_FK" style="font-weight: bold; color: #e50914;"><i class="fas fa-user"></i> Selecciona un Usuario:</label>
+                <select name="id_usuario_FK" id="id_usuario_FK" onchange="this.form.submit()" required>
+                    <option value="" {% if not selected_user_id %}selected{% endif %}>--- Elige un usuario para ver su agenda ---</option>
+                    {% for u in usuarios %}
+                        <option value="{{ u.id_usuario }}"
+                                {% if selected_user_id|int == u.id_usuario %}selected{% endif %}>
+                            {{ u.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
             </div>
-        </div>
-        {% endfor %}
+             <input type="hidden" name="year" value="{{ year if year }}">
+             <input type="hidden" name="month" value="{{ month if month }}">
+        </form>
     </div>
+
+    {% if selected_user_id %}
+    <div class="calendar-view">
+        <div class="planner-header" style="display: flex; justify-content: space-between; align-items: center; background: #111; padding: 15px; border-radius: 8px; border: 1px solid #333; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <a href="?id_usuario_FK={{ selected_user_id }}&year={{ prev_year }}&month={{ prev_month }}" class="btn btn-secondary btn-sm"><i class="fas fa-chevron-left"></i></a>
+                <div style="text-align: center;">
+                    <div style="font-size: 0.8rem; color: #888; letter-spacing: 1px;">AGENDA DE</div>
+                    <div style="font-size: 1.5rem; font-weight: bold; color: white;">{{ nombre_mes }}</div>
+                </div>
+                <a href="?id_usuario_FK={{ selected_user_id }}&year={{ next_year }}&month={{ next_month }}" class="btn btn-secondary btn-sm"><i class="fas fa-chevron-right"></i></a>
+            </div>
+            <a href="?id_usuario_FK={{ selected_user_id }}" class="btn btn-primary btn-sm"><i class="fas fa-calendar-day"></i> Mes Actual</a>
+
+        </div>
+
+        <div class="calendar-container">
+            {% for semana in calendar_weeks %}
+            <div class="week-row" style="margin-bottom: 20px;">
+                <div style="font-size: 0.7rem; color: #555; text-transform: uppercase; margin-bottom: 5px;">Semana {{ loop.index }}</div>
+
+                <div class="days-grid">
+                    {% for dia in semana %}
+                        {% if dia == 0 %}
+                            <div class="day-card empty" style="opacity: 0.2; border: 1px dashed #444; background: transparent;"></div>
+                        {% else %}
+                            {% set fecha_key = "%04d-%02d-%02d"|format(year, month, dia) %}
+                            {% set rutinas_hoy = rutinas_map.get(fecha_key, []) %}
+
+                            <div class="day-card" style="{% if dia == now.day and year == now.year and month == now.month %}border-color: #e50914; background: rgba(229,9,20,0.05);{% endif %}">
+
+                                <div style="display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 5px; margin-bottom: 5px;">
+                                    <span style="font-size: 0.8rem; color: #777;">
+                                        {% set dias_nombres = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"] %}
+                                        {{ dias_nombres[loop.index0] }}
+                                    </span>
+                                    <span style="font-weight: bold; font-size: 1.1rem;">{{ dia }}</span>
+                                </div>
+
+                            <div style="flex-grow: 1;">
+                                    {% for r in rutinas_hoy %}
+                                    <div class="routine-pill" style="
+                                        background: rgba(255,255,255,0.1);
+                                        padding: 5px;
+                                        margin-bottom: 4px;
+                                        border-radius: 3px;
+                                        font-size: 0.75rem;
+                                        border-left: 3px solid #e50914;
+                                    ">
+                                        <strong style="display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                            {{ titulos_dict[r.id_titulo_FK].titulo if titulos_dict[r.id_titulo_FK] else "..." }}
+                                        </strong>
+
+                                        <div style="text-align: right; margin-top: 3px;">
+                                            <a href="/web/rutinas/editar/{{ r.id_rutina }}?id_usuario_FK={{ selected_user_id }}" class="btn btn-warning btn-sm" style="color: #ffc107; margin-right: 5px; background: none; padding: 0;"><i class="fas fa-pen"></i></a>
+                                            <a href="/web/rutinas/eliminar/{{ r.id_rutina }}" class="btn btn-danger btn-sm" style="color: #dc3545; background: none; padding: 0;" onclick="return confirm('¿Borrar?')"><i class="fas fa-times"></i></a>
+                                        </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                <a href="/web/rutinas/crear?id_usuario_FK={{ selected_user_id }}&fecha_preseleccionada={{ fecha_key }}" class="btn-add-mini" style="margin-top: auto;">
+                                    <i class="fas fa-plus"></i>
+                                </a>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-secondary" style="text-align: center; font-size: 1.2rem; background: rgba(128, 128, 128, 0.2); border-left: 4px solid #808080;">
+        <p style="color: white; margin: 0;">
+            <i class="fas fa-info-circle"></i> Por favor, selecciona un usuario en el menú desplegable de arriba para cargar su plan de maratones.
+        </p>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

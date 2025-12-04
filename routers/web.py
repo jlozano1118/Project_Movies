@@ -385,49 +385,68 @@ async def restaurar_valoracion_web(id_valoracion: int, session: Session = Depend
 # ==========================================
 
 @router.get("/rutinas", response_class=HTMLResponse)
-async def pagina_rutinas(request: Request, session: Session = Depends(get_session)):
-    # 1. Obtener todas las rutinas activas
-    rutinas = session.exec(select(Rutina).where(Rutina.is_active == True)).all()
+async def pagina_rutinas(
+        request: Request,
+        id_usuario_FK: Optional[int] = None,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+        session: Session = Depends(get_session)
+):
+    # 1. Obtener todos los usuarios activos para el selector
+    usuarios = session.exec(select(Usuario).where(Usuario.is_active == True)).all()
 
-    # =========================================================================
-    # CORRECCIÓN AQUÍ: Rellenar todos los días del rango
-    # =========================================================================
+    hoy = date.today()
+
+    # Base context para la plantilla
+    context = {
+        "request": request,
+        "usuarios": usuarios,
+        "selected_user_id": id_usuario_FK,
+        "now": hoy,  # Fecha actual para resaltado de día
+        "year": year if year is not None else hoy.year,
+        "month": month if month is not None else hoy.month
+    }
+
+    # Si no se selecciona un usuario, se detiene aquí y se devuelve solo el selector.
+    if id_usuario_FK is None:
+        return templates.TemplateResponse("rutinas.html", context)
+
+    # --- Usuario seleccionado: Procede con la lógica del calendario ---
+
+    # 2. Filtrar rutinas por usuario seleccionado
+    query = select(Rutina).where(Rutina.is_active == True, Rutina.id_usuario_FK == id_usuario_FK)
+    rutinas = session.exec(query).all()
+
+    # 3. Mapeo de rutinas por día
     rutinas_map = {}
-
     for r in rutinas:
         fecha_cursor = r.fecha_inicio
         fecha_fin = r.fecha_fin
 
-        # Bucle: Mientras la fecha actual sea menor o igual a la fecha fin
         while fecha_cursor <= fecha_fin:
             fecha_str = fecha_cursor.strftime("%Y-%m-%d")
 
-            # Si la clave no existe, crear la lista para ese día
             if fecha_str not in rutinas_map:
                 rutinas_map[fecha_str] = []
 
-            # Agregar la rutina a ese día
             rutinas_map[fecha_str].append(r)
-
-            # Avanzar al siguiente día
             fecha_cursor += timedelta(days=1)
-    # =========================================================================
 
-    # 3. Diccionarios para nombres
-    usuarios = session.exec(select(Usuario)).all()
-    titulos = session.exec(select(PeliculaSerie)).all()
-    usuarios_dict = {u.id_usuario: u for u in usuarios}
+    # 4. Diccionario de Títulos (para mostrar el nombre del título en el calendario)
+    titulos = session.exec(select(PeliculaSerie).where(PeliculaSerie.is_active == True)).all()
     titulos_dict = {t.id_titulo: t for t in titulos}
 
-    # 4. Generar Calendario del Mes Actual
-    # NOTA: Aquí podrías capturar query params ?year=2023&month=12 para navegar
-    # Pero lo dejaremos como lo tienes (mes actual) para no romper nada más.
-    hoy = date.today()
+    # 5. Generación del Calendario (usa fecha actual o parámetros de URL)
+    target_year = year if year is not None else hoy.year
+    target_month = month if month is not None else hoy.month
 
-    # Variables de navegación básicas para que no falle el template
-    # (El template espera prev_year, next_year, etc. según el HTML que enviaste antes)
-    year = hoy.year
-    month = hoy.month
+    try:
+        target_date = date(target_year, target_month, 1)
+    except ValueError:
+        target_date = date(hoy.year, hoy.month, 1)
+
+    year = target_date.year
+    month = target_date.month
 
     cal = calendar.monthcalendar(year, month)
 
@@ -435,33 +454,42 @@ async def pagina_rutinas(request: Request, session: Session = Depends(get_sessio
              "Noviembre", "Diciembre"]
     nombre_mes = f"{meses[month]} De {year}"
 
-    # Calculamos mes previo y siguiente para los botones
-    prev_month = month - 1 if month > 1 else 12
-    prev_year = year if month > 1 else year - 1
-    next_month = month + 1 if month < 12 else 1
-    next_year = year if month < 12 else year + 1
+    # Calcular mes previo y siguiente (navegación)
+    prev_date = target_date - timedelta(days=1)
+    prev_month = prev_date.month
+    prev_year = prev_date.year
 
-    return templates.TemplateResponse("rutinas.html", {
-        "request": request,
+    if month == 12:
+        next_month = 1
+        next_year = year + 1
+    else:
+        next_month = month + 1
+        next_year = year
+
+    context.update({
         "calendar_weeks": cal,
-        "rutinas_map": rutinas_map,  # Ahora lleva los rangos completos
-        "usuarios_dict": usuarios_dict,
+        "rutinas_map": rutinas_map,
         "titulos_dict": titulos_dict,
         "year": year,
         "month": month,
         "nombre_mes": nombre_mes,
         "hoy_dia": hoy.day,
-        # Agregamos estas variables que tu HTML anterior pedía en los botones < >
         "prev_year": prev_year,
         "prev_month": prev_month,
         "next_year": next_year,
         "next_month": next_month
     })
 
+    return templates.TemplateResponse("rutinas.html", context)
+
 
 @router.get("/rutinas/crear", response_class=HTMLResponse)
-async def pagina_crear_rutina(request: Request, fecha_preseleccionada: Optional[str] = None,
-                              session: Session = Depends(get_session)):
+async def pagina_crear_rutina(
+        request: Request,
+        fecha_preseleccionada: Optional[str] = None,
+        id_usuario_FK: Optional[int] = None,  # Para pre-seleccionar desde el calendario
+        session: Session = Depends(get_session)
+):
     usuarios = session.exec(select(Usuario).where(Usuario.is_active == True)).all()
     titulos = session.exec(select(PeliculaSerie).where(PeliculaSerie.is_active == True)).all()
 
@@ -471,20 +499,49 @@ async def pagina_crear_rutina(request: Request, fecha_preseleccionada: Optional[
         "rutina": None,
         "usuarios": usuarios,
         "titulos": titulos,
-        "fecha_pre": fecha_preseleccionada  # Pasamos la fecha si viene del calendario
+        "fecha_pre": fecha_preseleccionada,
+        "selected_user_id": id_usuario_FK
     })
 
 
 @router.post("/rutinas/crear")
-async def crear_rutina_web(nombre: str = Form(...), id_usuario_FK: int = Form(...), id_titulo_FK: int = Form(...),
-                           fecha_inicio: str = Form(...), fecha_fin: str = Form(...),
-                           session: Session = Depends(get_session)):
+async def crear_rutina_web(
+        nombre: str = Form(...),
+        id_usuario_FK: int = Form(...),
+        id_titulo_FK: int = Form(...),
+        fecha_inicio: str = Form(...),
+        fecha_fin: str = Form(...),
+        session: Session = Depends(get_session)):
+    # 1. Conversión y Validación de Fechas
+    try:
+        f_inicio = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+        f_fin = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use AAAA-MM-DD.")
+
+    if f_inicio > f_fin:
+        raise HTTPException(status_code=400, detail="La fecha de inicio no puede ser posterior a la fecha de fin.")
+
+    # 2. Validación de Claves Foráneas (Usuario y Título deben existir y estar activos)
+    usuario = session.get(Usuario, id_usuario_FK)
+    titulo = session.get(PeliculaSerie, id_titulo_FK)
+
+    if not usuario or not usuario.is_active:
+        raise HTTPException(status_code=404, detail=f"Usuario con ID {id_usuario_FK} no encontrado o inactivo")
+    if not titulo or not titulo.is_active:
+        raise HTTPException(status_code=404, detail=f"Título con ID {id_titulo_FK} no encontrado o inactivo")
+
+    # 3. Creación
     rutina = Rutina(nombre=nombre, id_usuario_FK=id_usuario_FK, id_titulo_FK=id_titulo_FK,
-                    fecha_inicio=datetime.strptime(fecha_inicio, "%Y-%m-%d").date(),
-                    fecha_fin=datetime.strptime(fecha_fin, "%Y-%m-%d").date())
+                    fecha_inicio=f_inicio, fecha_fin=f_fin)
     session.add(rutina)
     session.commit()
-    return RedirectResponse(url="/web/rutinas?mensaje=Rutina creada", status_code=303)
+
+    # Redirección de vuelta al calendario del usuario seleccionado
+    return RedirectResponse(
+        url=f"/web/rutinas?id_usuario_FK={id_usuario_FK}&mensaje=Rutina creada",
+        status_code=303
+    )
 
 
 @router.get("/rutinas/editar/{id_rutina}", response_class=HTMLResponse)
@@ -492,33 +549,67 @@ async def pagina_editar_rutina(id_rutina: int, request: Request, session: Sessio
     rutina = session.get(Rutina, id_rutina)
     usuarios = session.exec(select(Usuario).where(Usuario.is_active == True)).all()
     titulos = session.exec(select(PeliculaSerie).where(PeliculaSerie.is_active == True)).all()
+
+    if not rutina:
+        raise HTTPException(status_code=404, detail=f"Rutina con ID {id_rutina} no encontrada")
+
     return templates.TemplateResponse("rutina_form.html",
                                       {"request": request, "accion": "Editar", "rutina": rutina, "usuarios": usuarios,
-                                       "titulos": titulos})
+                                       "titulos": titulos, "selected_user_id": rutina.id_usuario_FK})
 
 
 @router.post("/rutinas/editar/{id_rutina}")
-async def editar_rutina_web(id_rutina: int, nombre: str = Form(...), id_usuario_FK: int = Form(...),
-                            id_titulo_FK: int = Form(...), fecha_inicio: str = Form(...), fecha_fin: str = Form(...),
-                            session: Session = Depends(get_session)):
+async def editar_rutina_web(
+        id_rutina: int,
+        nombre: str = Form(...),
+        id_usuario_FK: int = Form(...),  # Valor del campo oculto
+        id_titulo_FK: int = Form(...),  # Valor del campo oculto
+        fecha_inicio: str = Form(...),
+        fecha_fin: str = Form(...),
+        session: Session = Depends(get_session)):
     rutina = session.get(Rutina, id_rutina)
+    if not rutina:
+        raise HTTPException(status_code=404, detail=f"Rutina con ID {id_rutina} no encontrada")
+
+    # 1. Conversión y Validación de Fechas
+    try:
+        f_inicio = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
+        f_fin = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use AAAA-MM-DD.")
+
+    if f_inicio > f_fin:
+        raise HTTPException(status_code=400, detail="La fecha de inicio no puede ser posterior a la fecha de fin.")
+
+    # 2. Actualización de datos
     rutina.nombre = nombre
     rutina.id_usuario_FK = id_usuario_FK
     rutina.id_titulo_FK = id_titulo_FK
-    rutina.fecha_inicio = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
-    rutina.fecha_fin = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
+    rutina.fecha_inicio = f_inicio
+    rutina.fecha_fin = f_fin
+
     session.commit()
-    return RedirectResponse(url="/web/rutinas?mensaje=Rutina actualizada", status_code=303)
+
+    # Redirección de vuelta al calendario del usuario seleccionado
+    return RedirectResponse(
+        url=f"/web/rutinas?id_usuario_FK={id_usuario_FK}&mensaje=Rutina actualizada",
+        status_code=303
+    )
 
 
 @router.get("/rutinas/eliminar/{id_rutina}")
 async def eliminar_rutina_web(id_rutina: int, session: Session = Depends(get_session)):
     rutina = session.get(Rutina, id_rutina)
+    user_id = None
     if rutina:
+        user_id = rutina.id_usuario_FK  # Obtener ID para la redirección
         rutina.is_active = False
         rutina.deleted_at = datetime.now()
         session.commit()
-    return RedirectResponse(url="/web/rutinas?mensaje=Rutina eliminada", status_code=303)
+
+    # Redirección de vuelta al calendario del usuario (si se pudo obtener el ID)
+    url = f"/web/rutinas?id_usuario_FK={user_id}&mensaje=Rutina eliminada" if user_id else "/web/rutinas?mensaje=Rutina eliminada"
+    return RedirectResponse(url=url, status_code=303)
 
 
 # ==========================================
