@@ -15,25 +15,36 @@
             </a>
         </div>
 
+        {% if error_message %}
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-triangle"></i> {{ error_message }}
+        </div>
+        {% endif %}
+
         <form method="post" class="data-form" enctype="multipart/form-data">
             <div class="form-group">
                 <label><i class="fas fa-user"></i> Nombre:</label>
-                <input type="text" name="nombre" value="{% if usuario %}{{ usuario.nombre }}{% endif %}" required>
+                <input type="text" name="nombre" value="{% if error_message %}{{ form_data.nombre }}{% elif usuario %}{{ usuario.nombre }}{% endif %}" required>
             </div>
 
             <div class="form-group">
                 <label><i class="fas fa-envelope"></i> Correo:</label>
-                <input type="email" name="correo" value="{% if usuario %}{{ usuario.correo }}{% endif %}" required>
+                <input type="email" name="correo" value="{% if error_message %}{{ form_data.correo }}{% elif usuario %}{{ usuario.correo }}{% endif %}" required>
             </div>
             <div class="form-group">
                 <label><i class="fas fa-envelope"></i> Imagen:</label>
-                <input type="file" name="img" value="{% if usuario %}{{ usuario.img }}{% endif %}">
+                <input type="file" name="img" accept="image/*">
+                {% if accion == 'Editar' and usuario.img and usuario.img != '/static/img/user-placeholder.png' %}
+                    <small style="color: #888; display: block; margin-top: 5px;">Dejar vacío para mantener la imagen actual. (Se usa una imagen por defecto si no se sube una nueva)</small>
+                {% else %}
+                    <small style="color: #888; display: block; margin-top: 5px;">Se usará una imagen por defecto si no se sube un archivo.</small>
+                {% endif %}
             </div>
 
             <div class="form-group">
                 <label><i class="fas fa-lock"></i> Contraseña:</label>
-                <input type="password" name="clave" 
-                       placeholder="{% if accion == 'Editar' %}Dejar vacía para mantener la actual{% endif %}"
+                <input type="password" name="clave"
+                       placeholder="{% if accion == 'Editar' %}Dejar vacía para mantener la actual (mín. 8 caracteres si se cambia){% else %}Mínimo 8 caracteres{% endif %}"
                        {% if accion == 'Crear' %}required{% endif %}>
             </div>
 

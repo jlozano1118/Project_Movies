@@ -15,19 +15,26 @@
             </a>
         </div>
 
+        {% if error_message %}
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-triangle"></i> {{ error_message }}
+        </div>
+        {% endif %}
+
         <form method="post" class="data-form">
             <div class="form-group">
                 <label><i class="fas fa-heading"></i> Nombre de la Rutina:</label>
-                <input type="text" name="nombre" value="{% if rutina %}{{ rutina.nombre }}{% endif %}" required>
+                <input type="text" name="nombre" value="{% if error_message %}{{ form_data.nombre }}{% elif rutina %}{{ rutina.nombre }}{% endif %}" required>
             </div>
 
             <div class="form-group">
                 <label><i class="fas fa-user"></i> Usuario:</label>
+                {% set selected_usuario = form_data.id_usuario_FK | default(rutina.id_usuario_FK if rutina else selected_user_id, true) %}
                 <select name="id_usuario_FK" required {% if accion == 'Editar' %}disabled{% endif %}>
                     <option value="">Seleccione un usuario</option>
                     {% for usuario in usuarios %}
                     <option value="{{ usuario.id_usuario }}"
-                            {% if rutina and rutina.id_usuario_FK == usuario.id_usuario %}selected{% elif accion == 'Crear' and selected_user_id and selected_user_id|int == usuario.id_usuario %}selected{% endif %}>
+                            {% if selected_usuario and selected_usuario | int == usuario.id_usuario %}selected{% endif %}>
                         {{ usuario.nombre }}
                     </option>
                     {% endfor %}
@@ -39,11 +46,12 @@
 
             <div class="form-group">
                 <label><i class="fas fa-film"></i> Título:</label>
+                {% set selected_titulo = form_data.id_titulo_FK | default(rutina.id_titulo_FK if rutina else none, true) %}
                 <select name="id_titulo_FK" required {% if accion == 'Editar' %}disabled{% endif %}>
                     <option value="">Seleccione un título</option>
                     {% for titulo in titulos %}
                     <option value="{{ titulo.id_titulo }}"
-                            {% if rutina and rutina.id_titulo_FK == titulo.id_titulo %}selected{% endif %}>
+                            {% if selected_titulo and selected_titulo | int == titulo.id_titulo %}selected{% endif %}>
                         {{ titulo.titulo }}
                     </option>
                     {% endfor %}
@@ -57,12 +65,12 @@
                 <div class="form-group">
                     <label><i class="fas fa-calendar-day"></i> Fecha Inicio:</label>
                     <input type="date" name="fecha_inicio"
-                           value="{% if rutina %}{{ rutina.fecha_inicio }}{% elif fecha_pre %}{{ fecha_pre }}{% endif %}" required>
+                           value="{% if error_message %}{{ form_data.fecha_inicio }}{% elif rutina %}{{ rutina.fecha_inicio }}{% elif fecha_pre %}{{ fecha_pre }}{% endif %}" required>
                 </div>
                 <div class="form-group">
                     <label><i class="fas fa-calendar-check"></i> Fecha Fin:</label>
                     <input type="date" name="fecha_fin"
-                           value="{% if rutina %}{{ rutina.fecha_fin }}{% elif fecha_pre %}{{ fecha_pre }}{% endif %}" required>
+                           value="{% if error_message %}{{ form_data.fecha_fin }}{% elif rutina %}{{ rutina.fecha_fin }}{% elif fecha_pre %}{{ fecha_pre }}{% endif %}" required>
                 </div>
             </div>
 

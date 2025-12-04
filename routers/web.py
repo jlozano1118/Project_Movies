@@ -13,7 +13,7 @@ from typing import Optional
 # --- Importaciones añadidas para Paginación y Estadísticas ---
 from sqlalchemy import func, desc  # func para count y avg; desc para orden descendente
 import math  # Para la función math.ceil
-
+import re
 # -------------------------------------------------------------
 
 
@@ -23,7 +23,8 @@ router = APIRouter(
 )
 
 templates = Jinja2Templates(directory="templates")
-
+DEFAULT_USER_IMG = '/static/img/user-placeholder.jpg'
+DEFAULT_MOVIE_IMG = '/static/img/placeholder_movie.jpg'
 
 # ==========================================
 # GESTIÓN DE USUARIOS
@@ -39,25 +40,56 @@ async def pagina_usuarios(request: Request, session: Session = Depends(get_sessi
 
 @router.get("/usuarios/crear", response_class=HTMLResponse)
 async def pagina_crear_usuario(request: Request):
-    return templates.TemplateResponse("usuario_form.html", {"request": request, "accion": "Crear", "usuario": None})
+    # Contexto inicial: sin errores y sin datos de formulario
+    return templates.TemplateResponse("usuario_form.html",
+                                      {"request": request, "accion": "Crear", "usuario": None, "error_message": None,
+                                       "form_data": {}})
 
 
 @router.post("/usuarios/crear")
 async def crear_usuario_web(
+        request: Request,
         nombre: str = Form(...),
         correo: str = Form(...),
         clave: str = Form(...),
         img: UploadFile = File(None),
         session: Session = Depends(get_session)
 ):
-    clave_hash = get_password_hash(clave)
+    form_data = {
+        "nombre": nombre,
+        "correo": correo,
+        # NO se incluye la clave por seguridad
+    }
 
-    img_url = None
-    if img is not None:
+    # 1. Validación: Nombre (No números)
+    if re.search(r'\d', nombre):
+        return templates.TemplateResponse("usuario_form.html", {
+            "request": request, "accion": "Crear", "usuario": None,
+            "error_message": "El nombre no puede contener números.", "form_data": form_data
+        })
+
+    # 2. Validación: Contraseña mínimo 8 caracteres
+    if len(clave) < 8:
+        return templates.TemplateResponse("usuario_form.html", {
+            "request": request, "accion": "Crear", "usuario": None,
+            "error_message": "La contraseña debe tener mínimo 8 caracteres.", "form_data": form_data
+        })
+
+    clave_hash = get_password_hash(clave)
+    img_url = DEFAULT_USER_IMG
+
+    # 3. Manejo de imagen por defecto o subida
+    if img and img.filename:
         try:
-            img_url = await upload_to_bucket(img)
+            file_content = await img.read()
+            if file_content:
+                await img.seek(0)
+                img_url = await upload_to_bucket(img)
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Error subiendo imagen: {str(e)}")
+            return templates.TemplateResponse("usuario_form.html", {
+                "request": request, "accion": "Crear", "usuario": None,
+                "error_message": f"Error al subir la imagen: {str(e)}", "form_data": form_data
+            })
 
     try:
         nuevo_usuario = Usuario(
@@ -70,7 +102,15 @@ async def crear_usuario_web(
         session.add(nuevo_usuario)
         session.commit()
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # 4. Validación: Correo duplicado (Unique constraint)
+        if "Unique violation" in str(e) or "already exists" in str(e) or "duplicate key" in str(e):
+            error_msg = f"Ya existe un usuario con el correo {correo}."
+        else:
+            error_msg = f"Error de base de datos: {str(e)}"
+
+        return templates.TemplateResponse("usuario_form.html", {
+            "request": request, "accion": "Crear", "usuario": None, "error_message": error_msg, "form_data": form_data
+        })
 
     return RedirectResponse(
         url="/web/usuarios?mensaje=Usuario creado correctamente",
@@ -81,20 +121,80 @@ async def crear_usuario_web(
 @router.get("/usuarios/editar/{id_usuario}", response_class=HTMLResponse)
 async def pagina_editar_usuario(id_usuario: int, request: Request, session: Session = Depends(get_session)):
     usuario = session.get(Usuario, id_usuario)
-    return templates.TemplateResponse("usuario_form.html", {"request": request, "accion": "Editar", "usuario": usuario})
+    return templates.TemplateResponse("usuario_form.html", {"request": request, "accion": "Editar", "usuario": usuario,
+                                                            "error_message": None, "form_data": {}})
 
 
 @router.post("/usuarios/editar/{id_usuario}")
-async def editar_usuario_web(id_usuario: int, nombre: str = Form(...), correo: str = Form(...),
-                             clave: Optional[str] = Form(None), session: Session = Depends(get_session)):
+async def editar_usuario_web(
+        id_usuario: int,
+        request: Request,
+        nombre: str = Form(...),
+        correo: str = Form(...),
+        clave: Optional[str] = Form(None),
+        img: UploadFile = File(None),
+        session: Session = Depends(get_session)
+):
     usuario = session.get(Usuario, id_usuario)
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    form_data = {
+        "nombre": nombre,
+        "correo": correo,
+        "clave": clave,
+    }
+
+    # 1. Validación: Nombre (No números)
+    if re.search(r'\d', nombre):
+        return templates.TemplateResponse("usuario_form.html", {
+            "request": request, "accion": "Editar", "usuario": usuario,
+            "error_message": "El nombre no puede contener números.", "form_data": form_data
+        })
+
+    # 2. Validación: Contraseña mínimo 8 caracteres (solo si se cambia)
+    if clave and clave.strip() != "" and len(clave) < 8:
+        return templates.TemplateResponse("usuario_form.html", {
+            "request": request, "accion": "Editar", "usuario": usuario,
+            "error_message": "La nueva contraseña debe tener mínimo 8 caracteres.", "form_data": form_data
+        })
+
+    # 3. Validación: Correo duplicado (si el correo es modificado)
+    if correo != usuario.correo:
+        existente = session.exec(
+            select(Usuario).where(Usuario.correo == correo, Usuario.id_usuario != id_usuario)).first()
+        if existente:
+            return templates.TemplateResponse("usuario_form.html", {
+                "request": request, "accion": "Editar", "usuario": usuario,
+                "error_message": f"El correo {correo} ya está en uso por otro usuario.", "form_data": form_data
+            })
+
+    # 4. Manejo de imagen por defecto o subida
+    img_url = usuario.img  # Conserva la imagen actual por defecto
+    if img and img.filename:
+        try:
+            file_content = await img.read()
+            if file_content:
+                await img.seek(0)
+                img_url = await upload_to_bucket(img)
+            # Si el contenido es vacío, mantiene la imagen actual (img_url no se modifica)
+        except Exception as e:
+            return templates.TemplateResponse("usuario_form.html", {
+                "request": request, "accion": "Editar", "usuario": usuario,
+                "error_message": f"Error al subir la imagen: {str(e)}", "form_data": form_data
+            })
+
+    # Actualizar datos
     usuario.nombre = nombre
     usuario.correo = correo
+    usuario.img = img_url
+
     if clave and clave.strip() != "":
         usuario.clave = get_password_hash(clave)
-    session.commit()
-    return RedirectResponse(url="/web/usuarios?mensaje=Usuario actualizado correctamente", status_code=303)
 
+    session.commit()
+    session.refresh(usuario)
+    return RedirectResponse(url="/web/usuarios?mensaje=Usuario actualizado correctamente", status_code=303)
 
 @router.get("/usuarios/eliminar/{id_usuario}")
 async def eliminar_usuario_web(id_usuario: int, session: Session = Depends(get_session)):
@@ -152,11 +252,14 @@ async def pagina_titulos(
 
 @router.get("/titulos/crear", response_class=HTMLResponse)
 async def pagina_crear_titulo(request: Request):
-    return templates.TemplateResponse("titulo_form.html", {"request": request, "accion": "Crear", "titulo": None})
+    return templates.TemplateResponse("titulo_form.html",
+                                      {"request": request, "accion": "Crear", "titulo": None, "error_message": None,
+                                       "form_data": {}})
 
 
 @router.post("/titulos/crear")
 async def crear_titulo_web(
+        request: Request,
         titulo: str = Form(...),
         genero: str = Form(...),
         anio_estreno: int = Form(...),
@@ -165,17 +268,45 @@ async def crear_titulo_web(
         img: UploadFile = File(None),
         session: Session = Depends(get_session)
 ):
-    img_url = None
-    if img is not None:
+    form_data = {
+        "titulo": titulo,
+        "genero": genero,
+        "anio_estreno": anio_estreno,
+        "duracion": duracion,
+        "descripcion": descripcion
+    }
+
+    # 1. Validación: Duración (debe ser positivo)
+    if duracion <= 0:
+        return templates.TemplateResponse("titulo_form.html", {
+            "request": request, "accion": "Crear", "titulo": None,
+            "error_message": "La duración debe ser un número positivo (mínimo 1).", "form_data": form_data
+        })
+
+    img_url = DEFAULT_MOVIE_IMG
+
+    # 2. Manejo de imagen por defecto o subida
+    if img and img.filename:
         try:
-            img_url = await upload_to_bucket(img)
+            file_content = await img.read()
+            if file_content:
+                await img.seek(0)
+                img_url = await upload_to_bucket(img)
         except Exception as e:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Error subiendo imagen: {str(e)}"
-            )
+            return templates.TemplateResponse("titulo_form.html", {
+                "request": request, "accion": "Crear", "titulo": None,
+                "error_message": f"Error al subir la imagen: {str(e)}", "form_data": form_data
+            })
 
     try:
+        # 3. Validación: Título duplicado (chequeo explícito antes de DB commit)
+        existente = session.exec(select(PeliculaSerie).where(PeliculaSerie.titulo == titulo)).first()
+        if existente:
+            return templates.TemplateResponse("titulo_form.html", {
+                "request": request, "accion": "Crear", "titulo": None,
+                "error_message": f"Ya existe un título con el nombre '{titulo}'.", "form_data": form_data
+            })
+
         nuevo_titulo = PeliculaSerie(
             titulo=titulo,
             genero=genero,
@@ -189,7 +320,11 @@ async def crear_titulo_web(
         session.commit()
 
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # Catch other potential DB errors
+        error_msg = f"Error de base de datos al crear título: {str(e)}"
+        return templates.TemplateResponse("titulo_form.html", {
+            "request": request, "accion": "Crear", "titulo": None, "error_message": error_msg, "form_data": form_data
+        })
 
     return RedirectResponse(
         url="/web/titulos?mensaje=Título creado correctamente",
@@ -200,19 +335,74 @@ async def crear_titulo_web(
 @router.get("/titulos/editar/{id_titulo}", response_class=HTMLResponse)
 async def pagina_editar_titulo(id_titulo: int, request: Request, session: Session = Depends(get_session)):
     titulo = session.get(PeliculaSerie, id_titulo)
-    return templates.TemplateResponse("titulo_form.html", {"request": request, "accion": "Editar", "titulo": titulo})
+    return templates.TemplateResponse("titulo_form.html",
+                                      {"request": request, "accion": "Editar", "titulo": titulo, "error_message": None,
+                                       "form_data": {}})
 
 
 @router.post("/titulos/editar/{id_titulo}")
-async def editar_titulo_web(id_titulo: int, titulo: str = Form(...), genero: str = Form(...),
-                            anio_estreno: int = Form(...), duracion: int = Form(...), descripcion: str = Form(...),
-                            session: Session = Depends(get_session)):
+async def editar_titulo_web(
+        id_titulo: int,
+        request: Request,
+        titulo: str = Form(...),
+        genero: str = Form(...),
+        anio_estreno: int = Form(...),
+        duracion: int = Form(...),
+        descripcion: str = Form(...),
+        img: UploadFile = File(None),
+        session: Session = Depends(get_session)
+):
     titulo_obj = session.get(PeliculaSerie, id_titulo)
+    if not titulo_obj:
+        raise HTTPException(status_code=404, detail="Título no encontrado")
+
+    form_data = {
+        "titulo": titulo,
+        "genero": genero,
+        "anio_estreno": anio_estreno,
+        "duracion": duracion,
+        "descripcion": descripcion
+    }
+
+    # 1. Validación: Duración (debe ser positivo)
+    if duracion <= 0:
+        return templates.TemplateResponse("titulo_form.html", {
+            "request": request, "accion": "Editar", "titulo": titulo_obj,
+            "error_message": "La duración debe ser un número positivo (mínimo 1).", "form_data": form_data
+        })
+
+    # 2. Validación: Título duplicado (si el título es modificado)
+    if titulo != titulo_obj.titulo:
+        existente = session.exec(
+            select(PeliculaSerie).where(PeliculaSerie.titulo == titulo, PeliculaSerie.id_titulo != id_titulo)).first()
+        if existente:
+            return templates.TemplateResponse("titulo_form.html", {
+                "request": request, "accion": "Editar", "titulo": titulo_obj,
+                "error_message": f"Ya existe un título con el nombre '{titulo}'.", "form_data": form_data
+            })
+
+    # 3. Manejo de imagen
+    img_url = titulo_obj.img  # Conserva la imagen actual por defecto
+    if img and img.filename:
+        try:
+            file_content = await img.read()
+            if file_content:
+                await img.seek(0)
+                img_url = await upload_to_bucket(img)
+        except Exception as e:
+            return templates.TemplateResponse("titulo_form.html", {
+                "request": request, "accion": "Editar", "titulo": titulo_obj,
+                "error_message": f"Error al subir la imagen: {str(e)}", "form_data": form_data
+            })
+
+    # Actualizar datos
     titulo_obj.titulo = titulo
     titulo_obj.genero = genero
     titulo_obj.anio_estreno = anio_estreno
     titulo_obj.duracion = duracion
     titulo_obj.descripcion = descripcion
+    titulo_obj.img = img_url
+
     session.commit()
     return RedirectResponse(url="/web/titulos?mensaje=Título actualizado correctamente", status_code=303)
 
@@ -240,7 +430,16 @@ async def restaurar_titulo_web(id_titulo: int, session: Session = Depends(get_se
 # ==========================================
 # GESTIÓN DE VALORACIONES
 # ==========================================
+def get_valoracion_form_data(session: Session, id_valoracion: Optional[int] = None):
+    usuarios = session.exec(select(Usuario).where(Usuario.is_active == True)).all()
+    titulos = session.exec(select(PeliculaSerie).where(PeliculaSerie.is_active == True)).all()
+    valoracion = session.get(Valoracion, id_valoracion) if id_valoracion else None
 
+    return {
+        "usuarios": usuarios,
+        "titulos": titulos,
+        "valoracion": valoracion
+    }
 @router.get("/valoraciones", response_class=HTMLResponse)
 async def pagina_valoraciones(request: Request, session: Session = Depends(get_session)):
     # Se obtienen todos los usuarios y títulos para la "Papelera" y para mapear en el modal
@@ -315,19 +514,72 @@ async def pagina_valoraciones(request: Request, session: Session = Depends(get_s
         "placeholder_user_img": '/static/img/user-placeholder.png'
     })
 
+
 @router.get("/valoraciones/crear", response_class=HTMLResponse)
 async def pagina_crear_valoracion(request: Request, session: Session = Depends(get_session)):
-    usuarios = session.exec(select(Usuario).where(Usuario.is_active == True)).all()
-    titulos = session.exec(select(PeliculaSerie).where(PeliculaSerie.is_active == True)).all()
+    context = get_valoracion_form_data(session)
     return templates.TemplateResponse("valoracion_form.html", {
-        "request": request, "accion": "Crear", "valoracion": None, "usuarios": usuarios, "titulos": titulos
+        "request": request, "accion": "Crear", "error_message": None, "form_data": {}, **context
     })
 
 
 @router.post("/valoraciones/crear")
-async def crear_valoracion_web(id_usuario_FK: int = Form(...), id_titulo_FK: int = Form(...),
-                               puntuacion: float = Form(...), comentario: str = Form(...), fecha: str = Form(...),
-                               session: Session = Depends(get_session)):
+async def crear_valoracion_web(
+        request: Request,
+        id_usuario_FK: int = Form(...),
+        id_titulo_FK: int = Form(...),
+        puntuacion: float = Form(...),
+        comentario: str = Form(...),
+        fecha: str = Form(...),
+        session: Session = Depends(get_session)):
+    context = get_valoracion_form_data(session)
+    form_data = {
+        "id_usuario_FK": id_usuario_FK,
+        "id_titulo_FK": id_titulo_FK,
+        "puntuacion": puntuacion,
+        "comentario": comentario,
+        "fecha": fecha
+    }
+
+    # 1. Validación: Puntuación (mínimo 1 estrella)
+    if puntuacion <= 0.0:
+        return templates.TemplateResponse("valoracion_form.html", {
+            "request": request, "accion": "Crear",
+            "error_message": "La puntuación no puede ser cero. Selecciona de 1 a 5 estrellas.", "form_data": form_data,
+            **context
+        })
+
+    # 2. Validación: Claves foráneas (Usuario y Título deben existir y estar activos)
+    usuario = session.get(Usuario, id_usuario_FK)
+    titulo = session.get(PeliculaSerie, id_titulo_FK)
+
+    if not usuario or not usuario.is_active:
+        return templates.TemplateResponse("valoracion_form.html", {
+            "request": request, "accion": "Crear",
+            "error_message": f"Usuario con ID {id_usuario_FK} no encontrado o inactivo.", "form_data": form_data,
+            **context
+        })
+    if not titulo or not titulo.is_active:
+        return templates.TemplateResponse("valoracion_form.html", {
+            "request": request, "accion": "Crear",
+            "error_message": f"Título con ID {id_titulo_FK} no encontrado o inactivo.", "form_data": form_data,
+            **context
+        })
+
+    # 3. Validación: No duplicar valoración para el mismo usuario y título
+    existing_rating = session.exec(select(Valoracion).where(
+        Valoracion.id_usuario_FK == id_usuario_FK,
+        Valoracion.id_titulo_FK == id_titulo_FK,
+        Valoracion.is_active == True
+    )).first()
+
+    if existing_rating:
+        return templates.TemplateResponse("valoracion_form.html", {
+            "request": request, "accion": "Crear",
+            "error_message": "Ya existe una valoración activa de este usuario para este título. Por favor, edita la valoración existente.",
+            "form_data": form_data, **context
+        })
+
     fecha_obj = datetime.strptime(fecha, "%Y-%m-%d").date()
     nueva_val = Valoracion(id_usuario_FK=id_usuario_FK, id_titulo_FK=id_titulo_FK, puntuacion=puntuacion,
                            comentario=comentario, fecha=fecha_obj)
@@ -338,19 +590,47 @@ async def crear_valoracion_web(id_usuario_FK: int = Form(...), id_titulo_FK: int
 
 @router.get("/valoraciones/editar/{id_valoracion}", response_class=HTMLResponse)
 async def pagina_editar_valoracion(id_valoracion: int, request: Request, session: Session = Depends(get_session)):
-    valoracion = session.get(Valoracion, id_valoracion)
-    usuarios = session.exec(select(Usuario).where(Usuario.is_active == True)).all()
-    titulos = session.exec(select(PeliculaSerie).where(PeliculaSerie.is_active == True)).all()
+    context = get_valoracion_form_data(session, id_valoracion)
+
+    if not context['valoracion']:
+        raise HTTPException(status_code=404, detail="Valoración no encontrada")
+
     return templates.TemplateResponse("valoracion_form.html",
-                                      {"request": request, "accion": "Editar", "valoracion": valoracion,
-                                       "usuarios": usuarios, "titulos": titulos})
+                                      {"request": request, "accion": "Editar", "error_message": None, "form_data": {},
+                                       **context})
 
 
 @router.post("/valoraciones/editar/{id_valoracion}")
-async def editar_valoracion_web(id_valoracion: int, id_usuario_FK: int = Form(...), id_titulo_FK: int = Form(...),
-                                puntuacion: float = Form(...), comentario: str = Form(...), fecha: str = Form(...),
+async def editar_valoracion_web(id_valoracion: int,
+                                request: Request,
+                                id_usuario_FK: int = Form(...),
+                                id_titulo_FK: int = Form(...),
+                                puntuacion: float = Form(...),
+                                comentario: str = Form(...),
+                                fecha: str = Form(...),
                                 session: Session = Depends(get_session)):
     val = session.get(Valoracion, id_valoracion)
+    if not val:
+        raise HTTPException(status_code=404, detail="Valoración no encontrada")
+
+    context = get_valoracion_form_data(session)
+
+    form_data = {
+        "id_usuario_FK": id_usuario_FK,
+        "id_titulo_FK": id_titulo_FK,
+        "puntuacion": puntuacion,
+        "comentario": comentario,
+        "fecha": fecha
+    }
+
+    # 1. Validación: Puntuación (mínimo 1 estrella)
+    if puntuacion <= 0.0:
+        return templates.TemplateResponse("valoracion_form.html", {
+            "request": request, "accion": "Editar",
+            "error_message": "La puntuación no puede ser cero. Selecciona de 1 a 5 estrellas.", "form_data": form_data,
+            "valoracion": val, **context
+        })
+
     val.id_usuario_FK = id_usuario_FK
     val.id_titulo_FK = id_titulo_FK
     val.puntuacion = puntuacion
@@ -483,55 +763,93 @@ async def pagina_rutinas(
     return templates.TemplateResponse("rutinas.html", context)
 
 
+# Helper function to get common data for Rutina forms
+def get_rutina_form_data(session: Session, id_rutina: Optional[int] = None):
+    usuarios = session.exec(select(Usuario).where(Usuario.is_active == True)).all()
+    titulos = session.exec(select(PeliculaSerie).where(PeliculaSerie.is_active == True)).all()
+    rutina = session.get(Rutina, id_rutina) if id_rutina else None
+
+    return {
+        "usuarios": usuarios,
+        "titulos": titulos,
+        "rutina": rutina
+    }
+
+
 @router.get("/rutinas/crear", response_class=HTMLResponse)
 async def pagina_crear_rutina(
         request: Request,
         fecha_preseleccionada: Optional[str] = None,
-        id_usuario_FK: Optional[int] = None,  # Para pre-seleccionar desde el calendario
+        id_usuario_FK: Optional[int] = None,
         session: Session = Depends(get_session)
 ):
-    usuarios = session.exec(select(Usuario).where(Usuario.is_active == True)).all()
-    titulos = session.exec(select(PeliculaSerie).where(PeliculaSerie.is_active == True)).all()
+    context = get_rutina_form_data(session)
 
     return templates.TemplateResponse("rutina_form.html", {
         "request": request,
         "accion": "Crear",
-        "rutina": None,
-        "usuarios": usuarios,
-        "titulos": titulos,
+        "error_message": None,
+        "form_data": {},
         "fecha_pre": fecha_preseleccionada,
-        "selected_user_id": id_usuario_FK
+        "selected_user_id": id_usuario_FK,
+        **context
     })
 
 
 @router.post("/rutinas/crear")
 async def crear_rutina_web(
+        request: Request,
         nombre: str = Form(...),
         id_usuario_FK: int = Form(...),
         id_titulo_FK: int = Form(...),
         fecha_inicio: str = Form(...),
         fecha_fin: str = Form(...),
         session: Session = Depends(get_session)):
+    context = get_rutina_form_data(session)
+    form_data = {
+        "nombre": nombre,
+        "id_usuario_FK": id_usuario_FK,
+        "id_titulo_FK": id_titulo_FK,
+        "fecha_inicio": fecha_inicio,
+        "fecha_fin": fecha_fin
+    }
+
     # 1. Conversión y Validación de Fechas
     try:
         f_inicio = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
         f_fin = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
     except ValueError:
-        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use AAAA-MM-DD.")
+        return templates.TemplateResponse("rutina_form.html", {
+            "request": request, "accion": "Crear", "error_message": "Formato de fecha inválido. Use AAAA-MM-DD.",
+            "form_data": form_data, **context
+        })
 
+    # 2. Validación: Fecha de inicio no puede ser posterior a la fecha de fin
     if f_inicio > f_fin:
-        raise HTTPException(status_code=400, detail="La fecha de inicio no puede ser posterior a la fecha de fin.")
+        return templates.TemplateResponse("rutina_form.html", {
+            "request": request, "accion": "Crear",
+            "error_message": "La fecha de inicio no puede ser posterior a la fecha de fin.", "form_data": form_data,
+            **context
+        })
 
-    # 2. Validación de Claves Foráneas (Usuario y Título deben existir y estar activos)
+    # 3. Validación: Claves foráneas (Usuario y Título deben existir y estar activos)
     usuario = session.get(Usuario, id_usuario_FK)
     titulo = session.get(PeliculaSerie, id_titulo_FK)
 
     if not usuario or not usuario.is_active:
-        raise HTTPException(status_code=404, detail=f"Usuario con ID {id_usuario_FK} no encontrado o inactivo")
+        return templates.TemplateResponse("rutina_form.html", {
+            "request": request, "accion": "Crear",
+            "error_message": f"Usuario con ID {id_usuario_FK} no encontrado o inactivo.", "form_data": form_data,
+            **context
+        })
     if not titulo or not titulo.is_active:
-        raise HTTPException(status_code=404, detail=f"Título con ID {id_titulo_FK} no encontrado o inactivo")
+        return templates.TemplateResponse("rutina_form.html", {
+            "request": request, "accion": "Crear",
+            "error_message": f"Título con ID {id_titulo_FK} no encontrado o inactivo.", "form_data": form_data,
+            **context
+        })
 
-    # 3. Creación
+    # 4. Creación
     rutina = Rutina(nombre=nombre, id_usuario_FK=id_usuario_FK, id_titulo_FK=id_titulo_FK,
                     fecha_inicio=f_inicio, fecha_fin=f_fin)
     session.add(rutina)
@@ -546,24 +864,25 @@ async def crear_rutina_web(
 
 @router.get("/rutinas/editar/{id_rutina}", response_class=HTMLResponse)
 async def pagina_editar_rutina(id_rutina: int, request: Request, session: Session = Depends(get_session)):
-    rutina = session.get(Rutina, id_rutina)
-    usuarios = session.exec(select(Usuario).where(Usuario.is_active == True)).all()
-    titulos = session.exec(select(PeliculaSerie).where(PeliculaSerie.is_active == True)).all()
+    context = get_rutina_form_data(session, id_rutina)
+    rutina = context['rutina']
 
     if not rutina:
         raise HTTPException(status_code=404, detail=f"Rutina con ID {id_rutina} no encontrada")
 
     return templates.TemplateResponse("rutina_form.html",
-                                      {"request": request, "accion": "Editar", "rutina": rutina, "usuarios": usuarios,
-                                       "titulos": titulos, "selected_user_id": rutina.id_usuario_FK})
+                                      {"request": request, "accion": "Editar", "error_message": None, "form_data": {},
+                                       **context,
+                                       "selected_user_id": rutina.id_usuario_FK})
 
 
 @router.post("/rutinas/editar/{id_rutina}")
 async def editar_rutina_web(
         id_rutina: int,
+        request: Request,
         nombre: str = Form(...),
-        id_usuario_FK: int = Form(...),  # Valor del campo oculto
-        id_titulo_FK: int = Form(...),  # Valor del campo oculto
+        id_usuario_FK: int = Form(...),
+        id_titulo_FK: int = Form(...),
         fecha_inicio: str = Form(...),
         fecha_fin: str = Form(...),
         session: Session = Depends(get_session)):
@@ -571,17 +890,34 @@ async def editar_rutina_web(
     if not rutina:
         raise HTTPException(status_code=404, detail=f"Rutina con ID {id_rutina} no encontrada")
 
+    context = get_rutina_form_data(session)
+    form_data = {
+        "nombre": nombre,
+        "id_usuario_FK": id_usuario_FK,
+        "id_titulo_FK": id_titulo_FK,
+        "fecha_inicio": fecha_inicio,
+        "fecha_fin": fecha_fin
+    }
+
     # 1. Conversión y Validación de Fechas
     try:
         f_inicio = datetime.strptime(fecha_inicio, "%Y-%m-%d").date()
         f_fin = datetime.strptime(fecha_fin, "%Y-%m-%d").date()
     except ValueError:
-        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use AAAA-MM-DD.")
+        return templates.TemplateResponse("rutina_form.html", {
+            "request": request, "accion": "Editar", "error_message": "Formato de fecha inválido. Use AAAA-MM-DD.",
+            "form_data": form_data, "rutina": rutina, **context
+        })
 
+    # 2. Validación: Fecha de inicio no puede ser posterior a la fecha de fin
     if f_inicio > f_fin:
-        raise HTTPException(status_code=400, detail="La fecha de inicio no puede ser posterior a la fecha de fin.")
+        return templates.TemplateResponse("rutina_form.html", {
+            "request": request, "accion": "Editar",
+            "error_message": "La fecha de inicio no puede ser posterior a la fecha de fin.", "form_data": form_data,
+            "rutina": rutina, **context
+        })
 
-    # 2. Actualización de datos
+    # 3. Actualización de datos
     rutina.nombre = nombre
     rutina.id_usuario_FK = id_usuario_FK
     rutina.id_titulo_FK = id_titulo_FK
@@ -595,7 +931,6 @@ async def editar_rutina_web(
         url=f"/web/rutinas?id_usuario_FK={id_usuario_FK}&mensaje=Rutina actualizada",
         status_code=303
     )
-
 
 @router.get("/rutinas/eliminar/{id_rutina}")
 async def eliminar_rutina_web(id_rutina: int, session: Session = Depends(get_session)):

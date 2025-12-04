@@ -13,18 +13,18 @@
         margin-bottom: 10px;
     }
     .star-rating i {
-        color: #555; 
+        color: #555;
         transition: color 0.2s;
     }
     .star-rating i.active {
-        color: #ffc107; 
+        color: #ffc107;
     }
     .rating-label {
         font-size: 1.1rem;
         font-weight: bold;
         color: #ffc107;
     }
-    
+
     /* Estilo para el campo de fecha bloqueado */
     input[readonly] {
         background-color: #2a2a2a !important; /* Un poco más oscuro */
@@ -46,14 +46,21 @@
             </a>
         </div>
 
+        {% if error_message %}
+        <div class="alert alert-error">
+            <i class="fas fa-exclamation-triangle"></i> {{ error_message }}
+        </div>
+        {% endif %}
+
         <form method="post" class="data-form">
             <div class="form-group">
                 <label><i class="fas fa-user"></i> Usuario:</label>
+                {% set selected_usuario = form_data.id_usuario_FK | default(valoracion.id_usuario_FK if valoracion else none, true) %}
                 <select name="id_usuario_FK" required {% if accion == 'Editar' %}disabled{% endif %}>
                     <option value="">Seleccione un usuario</option>
                     {% for usuario in usuarios %}
                     <option value="{{ usuario.id_usuario }}"
-                            {% if valoracion and valoracion.id_usuario_FK == usuario.id_usuario %}selected{% endif %}>
+                            {% if selected_usuario and selected_usuario | int == usuario.id_usuario %}selected{% endif %}>
                         {{ usuario.nombre }}
                     </option>
                     {% endfor %}
@@ -65,11 +72,12 @@
 
             <div class="form-group">
                 <label><i class="fas fa-film"></i> Título:</label>
-                <select name="id_titulo_FK" required {% if accion == 'Editar' %}disabled{% endif %}>
+                {% set selected_titulo = form_data.id_titulo_FK | default(valoracion.id_titulo_FK if valoracion else none, true) %}
+                <select name="id_titulo_FK" required {% if accion == 'Crear' %} {% if accion == 'Editar' %}disabled{% endif %} {% endif %}>
                     <option value="">Seleccione un título</option>
                     {% for titulo in titulos %}
                     <option value="{{ titulo.id_titulo }}"
-                            {% if valoracion and valoracion.id_titulo_FK == titulo.id_titulo %}selected{% endif %}>
+                            {% if selected_titulo and selected_titulo | int == titulo.id_titulo %}selected{% endif %}>
                         {{ titulo.titulo }}
                     </option>
                     {% endfor %}
@@ -81,7 +89,7 @@
 
             <div class="form-group">
                 <label><i class="fas fa-star"></i> Puntuación:</label>
-                
+
                 <div class="star-rating" id="star-container">
                     <i class="fas fa-star" data-value="1"></i>
                     <i class="fas fa-star" data-value="2"></i>
@@ -90,22 +98,24 @@
                     <i class="fas fa-star" data-value="5"></i>
                 </div>
 
-                <input type="hidden" name="puntuacion" id="input-puntuacion" 
-                       value="{% if valoracion %}{{ valoracion.puntuacion }}{% endif %}" required>
-                
+                <input type="hidden" name="puntuacion" id="input-puntuacion"
+                       value="{% if error_message %}{{ form_data.puntuacion | int }}{% elif valoracion %}{{ valoracion.puntuacion | int }}{% else %}0{% endif %}" required>
+
                 <div id="rating-text" class="rating-label">
-                    {% if valoracion %}{{ valoracion.puntuacion|int }}{% else %}0{% endif %} de 5
+                    {% set display_puntuacion = form_data.puntuacion | int if error_message else (valoracion.puntuacion | int if valoracion else 0) %}
+                    {{ display_puntuacion }} de 5
                 </div>
             </div>
 
             <div class="form-group">
                 <label><i class="fas fa-comment"></i> Comentario:</label>
-                <textarea name="comentario" rows="4" required>{% if valoracion %}{{ valoracion.comentario }}{% endif %}</textarea>
+                <textarea name="comentario" rows="4" required>{% if error_message %}{{ form_data.comentario }}{% elif valoracion %}{{ valoracion.comentario }}{% endif %}</textarea>
             </div>
 
             <div class="form-group">
                 <label><i class="fas fa-calendar"></i> Fecha (Automática):</label>
-                <input type="date" name="fecha" id="fecha-input" required readonly>
+                {% set fecha_val = form_data.fecha if error_message else (valoracion.fecha | default('', true) if valoracion else '') %}
+                <input type="date" name="fecha" id="fecha-input" value="{{ fecha_val }}" required readonly>
             </div>
 
             <div class="form-actions">
@@ -120,25 +130,21 @@
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        
+
         // --- 1. LÓGICA DE FECHA (SOLO HOY Y BLOQUEADA) ---
         const fechaInput = document.getElementById('fecha-input');
-        
+
         const hoy = new Date();
         const yyyy = hoy.getFullYear();
         const mm = String(hoy.getMonth() + 1).padStart(2, '0');
         const dd = String(hoy.getDate()).padStart(2, '0');
         const fechaFormateada = `${yyyy}-${mm}-${dd}`;
 
-        // Asignamos el valor
-        // Si ya viene un valor del servidor (ej: al editar), lo respetamos? 
-        // Tu regla dice "solo hoy", así que al crear forzamos hoy.
-        // Al editar, si quisieras mantener la fecha original, habría que cambiar esto.
-        // Pero para asegurar consistencia con tu petición "ni antes ni después", forzamos hoy.
-        if (!fechaInput.value) {
+        // Si la fecha está vacía (crear) o no es la fecha de un error, forzamos hoy.
+        if (fechaInput.value === "") {
              fechaInput.value = fechaFormateada;
         }
-        
+
         // Aunque sea readonly, es buena práctica mantener los límites por seguridad
         fechaInput.min = fechaFormateada;
         fechaInput.max = fechaFormateada;
@@ -148,18 +154,18 @@
         const stars = document.querySelectorAll('#star-container i');
         const input = document.getElementById('input-puntuacion');
         const text = document.getElementById('rating-text');
-        
-        let currentRating = input.value ? parseInt(input.value) : 0;
+
+        let currentRating = input.value ? parseFloat(input.value) : 0;
         updateStars(currentRating);
 
         stars.forEach(star => {
             star.addEventListener('mouseover', function() {
-                const val = parseInt(this.getAttribute('data-value'));
+                const val = parseFloat(this.getAttribute('data-value'));
                 updateStars(val);
             });
 
             star.addEventListener('click', function() {
-                const val = parseInt(this.getAttribute('data-value'));
+                const val = parseFloat(this.getAttribute('data-value'));
                 input.value = val;
                 currentRating = val;
                 updateStars(val);
@@ -175,7 +181,7 @@
         function updateStars(value) {
             text.innerText = value > 0 ? value + " de 5" : "Selecciona una calificación";
             stars.forEach(s => {
-                const sVal = parseInt(s.getAttribute('data-value'));
+                const sVal = parseFloat(s.getAttribute('data-value'));
                 if (sVal <= value) {
                     s.classList.add('active');
                 } else {
