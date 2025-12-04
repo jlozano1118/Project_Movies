@@ -1,17 +1,20 @@
-﻿
-
-from fastapi import APIRouter, Form, File, UploadFile, Depends, HTTPException,Request
-from fastapi.responses import RedirectResponse,HTMLResponse
+﻿from fastapi import APIRouter, Form, File, UploadFile, Depends, HTTPException, Request
+from fastapi.responses import RedirectResponse, HTMLResponse
 from sqlmodel import Session, select
 from fastapi.templating import Jinja2Templates
 from utils.db import get_session
 from supa.supabase import upload_to_bucket
 from utils.security import get_password_hash
-from data.models import Usuario,PeliculaSerie, Valoracion, Rutina
-from datetime import date, datetime,timedelta
+from data.models import Usuario, PeliculaSerie, Valoracion, Rutina
+from datetime import date, datetime, timedelta
 import calendar
 from typing import Optional
 
+# --- Importaciones añadidas para Paginación y Estadísticas ---
+from sqlalchemy import func, desc  # func para count y avg; desc para orden descendente
+import math  # Para la función math.ceil
+
+# -------------------------------------------------------------
 
 
 router = APIRouter(
@@ -21,6 +24,7 @@ router = APIRouter(
 
 templates = Jinja2Templates(directory="templates")
 
+
 # ==========================================
 # GESTIÓN DE USUARIOS
 # ==========================================
@@ -29,25 +33,24 @@ templates = Jinja2Templates(directory="templates")
 async def pagina_usuarios(request: Request, session: Session = Depends(get_session)):
     activos = session.exec(select(Usuario).where(Usuario.is_active == True)).all()
     inactivos = session.exec(select(Usuario).where(Usuario.is_active == False)).all()
-    return templates.TemplateResponse("usuarios.html", {"request": request, "usuarios_activos": activos, "usuarios_inactivos": inactivos})
+    return templates.TemplateResponse("usuarios.html", {"request": request, "usuarios_activos": activos,
+                                                        "usuarios_inactivos": inactivos})
+
 
 @router.get("/usuarios/crear", response_class=HTMLResponse)
 async def pagina_crear_usuario(request: Request):
     return templates.TemplateResponse("usuario_form.html", {"request": request, "accion": "Crear", "usuario": None})
 
 
-
 @router.post("/usuarios/crear")
 async def crear_usuario_web(
-    nombre: str = Form(...),
-    correo: str = Form(...),
-    clave: str = Form(...),
-    img: UploadFile = File(None),
-    session: Session = Depends(get_session)
+        nombre: str = Form(...),
+        correo: str = Form(...),
+        clave: str = Form(...),
+        img: UploadFile = File(None),
+        session: Session = Depends(get_session)
 ):
-
     clave_hash = get_password_hash(clave)
-
 
     img_url = None
     if img is not None:
@@ -55,7 +58,6 @@ async def crear_usuario_web(
             img_url = await upload_to_bucket(img)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Error subiendo imagen: {str(e)}")
-
 
     try:
         nuevo_usuario = Usuario(
@@ -81,8 +83,10 @@ async def pagina_editar_usuario(id_usuario: int, request: Request, session: Sess
     usuario = session.get(Usuario, id_usuario)
     return templates.TemplateResponse("usuario_form.html", {"request": request, "accion": "Editar", "usuario": usuario})
 
+
 @router.post("/usuarios/editar/{id_usuario}")
-async def editar_usuario_web(id_usuario: int, nombre: str = Form(...), correo: str = Form(...), clave: Optional[str] = Form(None), session: Session = Depends(get_session)):
+async def editar_usuario_web(id_usuario: int, nombre: str = Form(...), correo: str = Form(...),
+                             clave: Optional[str] = Form(None), session: Session = Depends(get_session)):
     usuario = session.get(Usuario, id_usuario)
     usuario.nombre = nombre
     usuario.correo = correo
@@ -90,6 +94,7 @@ async def editar_usuario_web(id_usuario: int, nombre: str = Form(...), correo: s
         usuario.clave = get_password_hash(clave)
     session.commit()
     return RedirectResponse(url="/web/usuarios?mensaje=Usuario actualizado correctamente", status_code=303)
+
 
 @router.get("/usuarios/eliminar/{id_usuario}")
 async def eliminar_usuario_web(id_usuario: int, session: Session = Depends(get_session)):
@@ -99,6 +104,7 @@ async def eliminar_usuario_web(id_usuario: int, session: Session = Depends(get_s
         usuario.deleted_at = datetime.now()
         session.commit()
     return RedirectResponse(url="/web/usuarios?mensaje=Usuario movido a inactivos", status_code=303)
+
 
 @router.get("/usuarios/restaurar/{id_usuario}")
 async def restaurar_usuario_web(id_usuario: int, session: Session = Depends(get_session)):
@@ -111,31 +117,54 @@ async def restaurar_usuario_web(id_usuario: int, session: Session = Depends(get_
 
 
 # ==========================================
-# GESTIÓN DE TÍTULOS
+# GESTIÓN DE TÍTULOS (CON PAGINACIÓN)
 # ==========================================
 
 @router.get("/titulos", response_class=HTMLResponse)
-async def pagina_titulos(request: Request, session: Session = Depends(get_session)):
-    activos = session.exec(select(PeliculaSerie).where(PeliculaSerie.is_active == True)).all()
+async def pagina_titulos(
+        request: Request,
+        page: int = 1,  # Parámetro de página
+        session: Session = Depends(get_session)
+):
+    limit = 10  # Películas por página (10 por solicitud)
+    offset = (page - 1) * limit
+
+    # 1. Total de títulos activos para calcular el número de páginas
+    total_query = select(func.count(PeliculaSerie.id_titulo)).where(PeliculaSerie.is_active == True)
+    total_titulos = session.exec(total_query).one()
+    total_pages = math.ceil(total_titulos / limit)
+
+    # 2. Obtener títulos paginados
+    query = select(PeliculaSerie).where(PeliculaSerie.is_active == True).offset(offset).limit(limit)
+    activos = session.exec(query).all()
+
+    # Inactivos (Estos se mantienen igual, sin paginación)
     inactivos = session.exec(select(PeliculaSerie).where(PeliculaSerie.is_active == False)).all()
-    return templates.TemplateResponse("titulos.html", {"request": request, "titulos_activos": activos, "titulos_inactivos": inactivos})
+
+    return templates.TemplateResponse("titulos.html", {
+        "request": request,
+        "titulos_activos": activos,
+        "titulos_inactivos": inactivos,
+        "current_page": page,
+        "total_pages": total_pages
+    })
+
 
 @router.get("/titulos/crear", response_class=HTMLResponse)
 async def pagina_crear_titulo(request: Request):
     return templates.TemplateResponse("titulo_form.html", {"request": request, "accion": "Crear", "titulo": None})
 
+
 @router.post("/titulos/crear")
 async def crear_titulo_web(
-    titulo: str = Form(...),
-    genero: str = Form(...),
-    anio_estreno: int = Form(...),
-    duracion: int = Form(...),
-    descripcion: str = Form(...),
-    img: UploadFile = File(None),
-    session: Session = Depends(get_session)
+        titulo: str = Form(...),
+        genero: str = Form(...),
+        anio_estreno: int = Form(...),
+        duracion: int = Form(...),
+        descripcion: str = Form(...),
+        img: UploadFile = File(None),
+        session: Session = Depends(get_session)
 ):
-
-
     img_url = None
     if img is not None:
         try:
@@ -145,7 +174,6 @@ async def crear_titulo_web(
                 status_code=400,
                 detail=f"Error subiendo imagen: {str(e)}"
             )
-
 
     try:
         nuevo_titulo = PeliculaSerie(
@@ -168,13 +196,17 @@ async def crear_titulo_web(
         status_code=303
     )
 
+
 @router.get("/titulos/editar/{id_titulo}", response_class=HTMLResponse)
 async def pagina_editar_titulo(id_titulo: int, request: Request, session: Session = Depends(get_session)):
     titulo = session.get(PeliculaSerie, id_titulo)
     return templates.TemplateResponse("titulo_form.html", {"request": request, "accion": "Editar", "titulo": titulo})
 
+
 @router.post("/titulos/editar/{id_titulo}")
-async def editar_titulo_web(id_titulo: int, titulo: str = Form(...), genero: str = Form(...), anio_estreno: int = Form(...), duracion: int = Form(...), descripcion: str = Form(...), session: Session = Depends(get_session)):
+async def editar_titulo_web(id_titulo: int, titulo: str = Form(...), genero: str = Form(...),
+                            anio_estreno: int = Form(...), duracion: int = Form(...), descripcion: str = Form(...),
+                            session: Session = Depends(get_session)):
     titulo_obj = session.get(PeliculaSerie, id_titulo)
     titulo_obj.titulo = titulo
     titulo_obj.genero = genero
@@ -184,6 +216,7 @@ async def editar_titulo_web(id_titulo: int, titulo: str = Form(...), genero: str
     session.commit()
     return RedirectResponse(url="/web/titulos?mensaje=Título actualizado correctamente", status_code=303)
 
+
 @router.get("/titulos/eliminar/{id_titulo}")
 async def eliminar_titulo_web(id_titulo: int, session: Session = Depends(get_session)):
     titulo = session.get(PeliculaSerie, id_titulo)
@@ -192,6 +225,7 @@ async def eliminar_titulo_web(id_titulo: int, session: Session = Depends(get_ses
         titulo.deleted_at = datetime.now()
         session.commit()
     return RedirectResponse(url="/web/titulos?mensaje=Título movido a inactivos", status_code=303)
+
 
 @router.get("/titulos/restaurar/{id_titulo}")
 async def restaurar_titulo_web(id_titulo: int, session: Session = Depends(get_session)):
@@ -215,11 +249,12 @@ async def pagina_valoraciones(request: Request, session: Session = Depends(get_s
     titulos = session.exec(select(PeliculaSerie)).all()
     usuarios_dict = {u.id_usuario: u for u in usuarios}
     titulos_dict = {t.id_titulo: t for t in titulos}
-    
+
     return templates.TemplateResponse("valoraciones.html", {
         "request": request, "valoraciones_activas": activas, "valoraciones_inactivas": inactivas,
         "usuarios_dict": usuarios_dict, "titulos_dict": titulos_dict
     })
+
 
 @router.get("/valoraciones/crear", response_class=HTMLResponse)
 async def pagina_crear_valoracion(request: Request, session: Session = Depends(get_session)):
@@ -229,23 +264,33 @@ async def pagina_crear_valoracion(request: Request, session: Session = Depends(g
         "request": request, "accion": "Crear", "valoracion": None, "usuarios": usuarios, "titulos": titulos
     })
 
+
 @router.post("/valoraciones/crear")
-async def crear_valoracion_web(id_usuario_FK: int = Form(...), id_titulo_FK: int = Form(...), puntuacion: float = Form(...), comentario: str = Form(...), fecha: str = Form(...), session: Session = Depends(get_session)):
+async def crear_valoracion_web(id_usuario_FK: int = Form(...), id_titulo_FK: int = Form(...),
+                               puntuacion: float = Form(...), comentario: str = Form(...), fecha: str = Form(...),
+                               session: Session = Depends(get_session)):
     fecha_obj = datetime.strptime(fecha, "%Y-%m-%d").date()
-    nueva_val = Valoracion(id_usuario_FK=id_usuario_FK, id_titulo_FK=id_titulo_FK, puntuacion=puntuacion, comentario=comentario, fecha=fecha_obj)
+    nueva_val = Valoracion(id_usuario_FK=id_usuario_FK, id_titulo_FK=id_titulo_FK, puntuacion=puntuacion,
+                           comentario=comentario, fecha=fecha_obj)
     session.add(nueva_val)
     session.commit()
     return RedirectResponse(url="/web/valoraciones?mensaje=Valoración registrada", status_code=303)
+
 
 @router.get("/valoraciones/editar/{id_valoracion}", response_class=HTMLResponse)
 async def pagina_editar_valoracion(id_valoracion: int, request: Request, session: Session = Depends(get_session)):
     valoracion = session.get(Valoracion, id_valoracion)
     usuarios = session.exec(select(Usuario).where(Usuario.is_active == True)).all()
     titulos = session.exec(select(PeliculaSerie).where(PeliculaSerie.is_active == True)).all()
-    return templates.TemplateResponse("valoracion_form.html", {"request": request, "accion": "Editar", "valoracion": valoracion, "usuarios": usuarios, "titulos": titulos})
+    return templates.TemplateResponse("valoracion_form.html",
+                                      {"request": request, "accion": "Editar", "valoracion": valoracion,
+                                       "usuarios": usuarios, "titulos": titulos})
+
 
 @router.post("/valoraciones/editar/{id_valoracion}")
-async def editar_valoracion_web(id_valoracion: int, id_usuario_FK: int = Form(...), id_titulo_FK: int = Form(...), puntuacion: float = Form(...), comentario: str = Form(...), fecha: str = Form(...), session: Session = Depends(get_session)):
+async def editar_valoracion_web(id_valoracion: int, id_usuario_FK: int = Form(...), id_titulo_FK: int = Form(...),
+                                puntuacion: float = Form(...), comentario: str = Form(...), fecha: str = Form(...),
+                                session: Session = Depends(get_session)):
     val = session.get(Valoracion, id_valoracion)
     val.id_usuario_FK = id_usuario_FK
     val.id_titulo_FK = id_titulo_FK
@@ -255,6 +300,7 @@ async def editar_valoracion_web(id_valoracion: int, id_usuario_FK: int = Form(..
     session.commit()
     return RedirectResponse(url="/web/valoraciones?mensaje=Valoración actualizada", status_code=303)
 
+
 @router.get("/valoraciones/eliminar/{id_valoracion}")
 async def eliminar_valoracion_web(id_valoracion: int, session: Session = Depends(get_session)):
     val = session.get(Valoracion, id_valoracion)
@@ -263,6 +309,7 @@ async def eliminar_valoracion_web(id_valoracion: int, session: Session = Depends
         val.deleted_at = datetime.now()
         session.commit()
     return RedirectResponse(url="/web/valoraciones?mensaje=Valoración movida a papelera", status_code=303)
+
 
 @router.get("/valoraciones/restaurar/{id_valoracion}")
 async def restaurar_valoracion_web(id_valoracion: int, session: Session = Depends(get_session)):
@@ -352,36 +399,49 @@ async def pagina_rutinas(request: Request, session: Session = Depends(get_sessio
         "next_month": next_month
     })
 
+
 @router.get("/rutinas/crear", response_class=HTMLResponse)
-async def pagina_crear_rutina(request: Request, fecha_preseleccionada: Optional[str] = None, session: Session = Depends(get_session)):
+async def pagina_crear_rutina(request: Request, fecha_preseleccionada: Optional[str] = None,
+                              session: Session = Depends(get_session)):
     usuarios = session.exec(select(Usuario).where(Usuario.is_active == True)).all()
     titulos = session.exec(select(PeliculaSerie).where(PeliculaSerie.is_active == True)).all()
-    
+
     return templates.TemplateResponse("rutina_form.html", {
-        "request": request, 
-        "accion": "Crear", 
-        "rutina": None, 
-        "usuarios": usuarios, 
+        "request": request,
+        "accion": "Crear",
+        "rutina": None,
+        "usuarios": usuarios,
         "titulos": titulos,
-        "fecha_pre": fecha_preseleccionada # Pasamos la fecha si viene del calendario
+        "fecha_pre": fecha_preseleccionada  # Pasamos la fecha si viene del calendario
     })
 
+
 @router.post("/rutinas/crear")
-async def crear_rutina_web(nombre: str = Form(...), id_usuario_FK: int = Form(...), id_titulo_FK: int = Form(...), fecha_inicio: str = Form(...), fecha_fin: str = Form(...), session: Session = Depends(get_session)):
-    rutina = Rutina(nombre=nombre, id_usuario_FK=id_usuario_FK, id_titulo_FK=id_titulo_FK, fecha_inicio=datetime.strptime(fecha_inicio, "%Y-%m-%d").date(), fecha_fin=datetime.strptime(fecha_fin, "%Y-%m-%d").date())
+async def crear_rutina_web(nombre: str = Form(...), id_usuario_FK: int = Form(...), id_titulo_FK: int = Form(...),
+                           fecha_inicio: str = Form(...), fecha_fin: str = Form(...),
+                           session: Session = Depends(get_session)):
+    rutina = Rutina(nombre=nombre, id_usuario_FK=id_usuario_FK, id_titulo_FK=id_titulo_FK,
+                    fecha_inicio=datetime.strptime(fecha_inicio, "%Y-%m-%d").date(),
+                    fecha_fin=datetime.strptime(fecha_fin, "%Y-%m-%d").date())
     session.add(rutina)
     session.commit()
     return RedirectResponse(url="/web/rutinas?mensaje=Rutina creada", status_code=303)
+
 
 @router.get("/rutinas/editar/{id_rutina}", response_class=HTMLResponse)
 async def pagina_editar_rutina(id_rutina: int, request: Request, session: Session = Depends(get_session)):
     rutina = session.get(Rutina, id_rutina)
     usuarios = session.exec(select(Usuario).where(Usuario.is_active == True)).all()
     titulos = session.exec(select(PeliculaSerie).where(PeliculaSerie.is_active == True)).all()
-    return templates.TemplateResponse("rutina_form.html", {"request": request, "accion": "Editar", "rutina": rutina, "usuarios": usuarios, "titulos": titulos})
+    return templates.TemplateResponse("rutina_form.html",
+                                      {"request": request, "accion": "Editar", "rutina": rutina, "usuarios": usuarios,
+                                       "titulos": titulos})
+
 
 @router.post("/rutinas/editar/{id_rutina}")
-async def editar_rutina_web(id_rutina: int, nombre: str = Form(...), id_usuario_FK: int = Form(...), id_titulo_FK: int = Form(...), fecha_inicio: str = Form(...), fecha_fin: str = Form(...), session: Session = Depends(get_session)):
+async def editar_rutina_web(id_rutina: int, nombre: str = Form(...), id_usuario_FK: int = Form(...),
+                            id_titulo_FK: int = Form(...), fecha_inicio: str = Form(...), fecha_fin: str = Form(...),
+                            session: Session = Depends(get_session)):
     rutina = session.get(Rutina, id_rutina)
     rutina.nombre = nombre
     rutina.id_usuario_FK = id_usuario_FK
@@ -391,6 +451,7 @@ async def editar_rutina_web(id_rutina: int, nombre: str = Form(...), id_usuario_
     session.commit()
     return RedirectResponse(url="/web/rutinas?mensaje=Rutina actualizada", status_code=303)
 
+
 @router.get("/rutinas/eliminar/{id_rutina}")
 async def eliminar_rutina_web(id_rutina: int, session: Session = Depends(get_session)):
     rutina = session.get(Rutina, id_rutina)
@@ -399,3 +460,54 @@ async def eliminar_rutina_web(id_rutina: int, session: Session = Depends(get_ses
         rutina.deleted_at = datetime.now()
         session.commit()
     return RedirectResponse(url="/web/rutinas?mensaje=Rutina eliminada", status_code=303)
+
+
+# ==========================================
+# NUEVO: ESTADÍSTICAS
+# ==========================================
+
+@router.get("/estadisticas", response_class=HTMLResponse)
+async def pagina_estadisticas(request: Request, session: Session = Depends(get_session)):
+    # 1. Conteo General
+    n_usuarios = session.exec(select(func.count(Usuario.id_usuario)).where(Usuario.is_active == True)).one()
+    n_titulos = session.exec(select(func.count(PeliculaSerie.id_titulo)).where(PeliculaSerie.is_active == True)).one()
+    n_valoraciones = session.exec(
+        select(func.count(Valoracion.id_valoracion)).where(Valoracion.is_active == True)).one()
+
+    # 2. Películas mejor valoradas (Top Rated)
+    # Hacemos un Join para obtener el título y el promedio de sus valoraciones
+    top_rated_query = (
+        select(PeliculaSerie.titulo, func.avg(Valoracion.puntuacion).label("promedio"))
+        .join(Valoracion)
+        .where(PeliculaSerie.is_active == True)
+        .group_by(PeliculaSerie.id_titulo)
+        .order_by(desc("promedio"))
+        .limit(5)
+    )
+    top_rated_results = session.exec(top_rated_query).all()
+
+    # Formatear para Chart.js
+    top_rated_labels = [r[0] for r in top_rated_results]
+    top_rated_data = [round(r[1], 1) for r in top_rated_results]
+
+    # 3. Distribución por Género
+    genre_query = (
+        select(PeliculaSerie.genero, func.count(PeliculaSerie.id_titulo))
+        .where(PeliculaSerie.is_active == True)
+        .group_by(PeliculaSerie.genero)
+    )
+    genre_results = session.exec(genre_query).all()
+
+    genre_labels = [r[0] for r in genre_results]
+    genre_data = [r[1] for r in genre_results]
+
+    return templates.TemplateResponse("estadisticas.html", {
+        "request": request,
+        "n_usuarios": n_usuarios,
+        "n_titulos": n_titulos,
+        "n_valoraciones": n_valoraciones,
+        "top_rated_labels": top_rated_labels,
+        "top_rated_data": top_rated_data,
+        "genre_labels": genre_labels,
+        "genre_data": genre_data
+    })

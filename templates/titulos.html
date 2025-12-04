@@ -5,131 +5,158 @@
 {% block content %}
 <div class="container">
     <div class="page-header">
-        <h1><i class="fas fa-video"></i> Catálogo de Películas y Series</h1>
-        <a href="/web/titulos/crear" class="btn btn-success">
-            <i class="fas fa-plus"></i> Nuevo Título
-        </a>
-    </div>
-
-    {% if request.query_params.get('mensaje') %}
-    <div class="alert alert-success">
-        <i class="fas fa-check-circle"></i>
-        {{ request.query_params.get('mensaje') }}
-    </div>
-    {% endif %}
-
-    <div style="margin-bottom: 20px; display: flex; gap: 10px;">
-        <button onclick="cambiarVista('activos')" id="btn-activos" class="btn btn-primary">
-            <i class="fas fa-film"></i> Catálogo Activo
-        </button>
-        <button onclick="cambiarVista('inactivos')" id="btn-inactivos" class="btn btn-secondary">
-            <i class="fas fa-trash-alt"></i> Papelera
-        </button>
-    </div>
-
-    <div id="vista-activos">
-        <div class="table-container">
-            <h3><i class="fas fa-play-circle"></i> Títulos Disponibles</h3>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Título</th>
-                        <th>Género</th>
-                        <th>Año</th>
-                         <th>Duración (min o temporadas)</th>
-                        <th>Imagen</th>
-                        <th>Estado</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if titulos_activos %}
-                        {% for titulo in titulos_activos %}
-                        <tr>
-                            <td>{{ titulo.id_titulo }}</td>
-                            <td>{{ titulo.titulo }}</td>
-                            <td>{{ titulo.genero }}</td>
-                            <td>{{ titulo.anio_estreno }}</td>
-                            <td>{{ titulo.duracion }} min</td>
-                             <td class="img-cell">
-                                <img src="{{ titulo.img if titulo.img else '/static/img/user-placeholder.png' }}"
-                                     class="user-img"
-                                     alt="imagen">
-                            </td>
-                            <td>
-                                <span class="badge badge-active">Activo</span>
-                            </td>
-                            <td class="actions-cell">
-                                <a href="/web/titulos/editar/{{ titulo.id_titulo }}" class="btn btn-warning btn-sm">
-                                    <i class="fas fa-edit"></i>
-                                </a>
-                                <a href="/web/titulos/eliminar/{{ titulo.id_titulo }}"
-                                   class="btn btn-danger btn-sm"
-                                   onclick="return confirm('¿Estás seguro de eliminar este título?')">
-                                    <i class="fas fa-trash"></i>
-                                </a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="7" class="loading">No hay títulos registrados</td>
-                        </tr>
-                    {% endif %}
-                </tbody>
-            </table>
+        <h1><i class="fas fa-film"></i> Catálogo</h1>
+        <div style="display: flex; gap: 10px;">
+            <a href="/web/estadisticas" class="btn btn-secondary">
+                <i class="fas fa-chart-bar"></i> Ver Estadísticas
+            </a>
+            <a href="/web/titulos/crear" class="btn btn-success">
+                <i class="fas fa-plus"></i> Nuevo Título
+            </a>
         </div>
     </div>
 
+    <div style="margin-bottom: 20px; display: flex; gap: 10px;">
+        <button onclick="cambiarVista('activos')" id="btn-activos" class="btn btn-primary">Catálogo</button>
+        <button onclick="cambiarVista('inactivos')" id="btn-inactivos" class="btn btn-secondary">Papelera</button>
+    </div>
+
+    <div id="vista-activos">
+
+        <div class="movie-grid">
+            {% if titulos_activos %}
+                {% for titulo in titulos_activos %}
+
+                <div class="movie-card" onclick="openTitleModal(
+                    '{{ titulo.titulo | safe }}',
+                    '{{ titulo.descripcion | safe }}',
+                    '{{ titulo.genero | safe }}',
+                    '{{ titulo.anio_estreno }}',
+                    '{{ titulo.img if titulo.img else '/static/img/placeholder_movie.jpg' }}',
+                    '{{ titulo.id_titulo }}'
+                )">
+                    <div class="movie-poster">
+                        <img src="{{ titulo.img if titulo.img else '/static/img/placeholder_movie.jpg' }}" alt="{{ titulo.titulo }}">
+                        </div>
+                    <div class="movie-info">
+                        <h3>{{ titulo.titulo }}</h3>
+                        <div class="meta-info">
+                            <span class="badge">{{ titulo.genero }}</span>
+                            <span class="year">{{ titulo.anio_estreno }}</span>
+                        </div>
+                        <p class="desc">{{ titulo.descripcion[:60] }}...</p>
+                        <div class="card-actions">
+                            <a href="/web/titulos/editar/{{ titulo.id_titulo }}" class="btn btn-sm btn-warning" onclick="event.stopPropagation();"><i class="fas fa-pen"></i></a>
+                            <a href="/web/titulos/eliminar/{{ titulo.id_titulo }}" class="btn btn-sm btn-danger" onclick="event.stopPropagation(); return confirm('¿Eliminar?')"><i class="fas fa-trash"></i></a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p>No hay títulos registrados.</p>
+            {% endif %}
+        </div>
+
+        <div class="pagination-container">
+            {% if current_page > 1 %}
+                <a href="?page={{ current_page - 1 }}" class="btn btn-secondary"><i class="fas fa-chevron-left"></i> Anterior</a>
+            {% else %}
+                <button class="btn btn-secondary" disabled style="opacity: 0.5"><i class="fas fa-chevron-left"></i> Anterior</button>
+            {% endif %}
+
+            <span class="page-info">Página {{ current_page }} de {{ total_pages }}</span>
+
+            {% if current_page < total_pages %}
+                <a href="?page={{ current_page + 1 }}" class="btn btn-primary">Siguiente <i class="fas fa-chevron-right"></i></a>
+            {% else %}
+                <button class="btn btn-primary" disabled style="opacity: 0.5">Siguiente <i class="fas fa-chevron-right"></i></button>
+            {% endif %}
+        </div>
+
+    </div>
+
     <div id="vista-inactivos" style="display: none;">
-        <div class="table-container" style="background: rgba(40, 40, 40, 0.6); border: 1px solid #444;">
-            <h3 style="color: #ccc;"><i class="fas fa-archive"></i> Títulos Eliminados</h3>
+        <div class="table-container" style="background: rgba(40, 40, 40, 0.6);">
+            <h3>Papelera</h3>
             <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Título</th>
-                        <th>Género</th>
-                        <th>Año</th>
-                        <th>Duración (min o temporadas)</th>
-                        <th>Estado</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
+                <thead><tr><th>Título</th><th>Acción</th></tr></thead>
                 <tbody>
-                    {% if titulos_inactivos %}
-                        {% for titulo in titulos_inactivos %}
-                        <tr>
-                            <td>{{ titulo.id_titulo }}</td>
-                            <td>{{ titulo.titulo }}</td>
-                            <td>{{ titulo.genero }}</td>
-                            <td>{{ titulo.anio_estreno }}</td>
-                            <td>{{ titulo.duracion }}</td>
-                            <td>
-                                <span class="badge badge-inactive">Inactivo</span>
-                            </td>
-                            <td class="actions-cell">
-                                <a href="/web/titulos/restaurar/{{ titulo.id_titulo }}" 
-                                   class="btn btn-success btn-sm"
-                                   onclick="return confirm('¿Deseas reactivar este título?')">
-                                    <i class="fas fa-undo"></i> Restaurar
-                                </a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="7" class="loading">La papelera está vacía</td>
-                        </tr>
-                    {% endif %}
+                    {% for titulo in titulos_inactivos %}
+                    <tr>
+                        <td>{{ titulo.titulo }}</td>
+                        <td><a href="/web/titulos/restaurar/{{ titulo.id_titulo }}" class="btn btn-success btn-sm">Restaurar</a></td>
+                    </tr>
+                    {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
 </div>
 
+<div id="titleModal" class="modal">
+    <div class="modal-content title-modal">
+        <span class="close" onclick="closeTitleModal()">&times;</span>
+        <div class="title-details">
+            <div class="title-poster-container">
+                <img id="modal-poster" src="" alt="Poster">
+            </div>
+            <div class="title-info-content">
+                <h2 id="modal-title"></h2>
+                <div class="modal-meta">
+                    <span id="modal-year"></span>
+                    <span id="modal-genre" class="badge"></span>
+                </div>
+                <p id="modal-description"></p>
+                <div class="modal-actions">
+                    <a id="modal-edit-btn" href="#" class="btn btn-warning"><i class="fas fa-pen"></i> Editar</a>
+                    <a id="modal-delete-btn" href="#" class="btn btn-danger" onclick="return confirm('¿Eliminar?')"><i class="fas fa-trash"></i> Eliminar</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+    // Variable global para el modal
+    const modal = document.getElementById('titleModal');
+
+    function openTitleModal(titulo, descripcion, genero, anio, imgUrl, id_titulo) {
+        // Obtenemos los elementos del modal
+        const modalTitle = document.getElementById('modal-title');
+        const modalPoster = document.getElementById('modal-poster');
+        const modalYear = document.getElementById('modal-year');
+        const modalGenre = document.getElementById('modal-genre');
+        const modalDescription = document.getElementById('modal-description');
+        const modalEditBtn = document.getElementById('modal-edit-btn');
+        const modalDeleteBtn = document.getElementById('modal-delete-btn');
+
+        // Llenamos el contenido del modal
+        modalTitle.textContent = titulo;
+        modalPoster.src = imgUrl;
+        modalYear.textContent = anio;
+        modalGenre.textContent = genero;
+        modalDescription.textContent = descripcion;
+
+        // Configuramos los enlaces de acción con el ID correcto
+        modalEditBtn.href = `/web/titulos/editar/${id_titulo}`;
+        modalDeleteBtn.href = `/web/titulos/eliminar/${id_titulo}`;
+
+        // Hacemos visible el modal
+        modal.style.display = "block";
+    }
+
+    function closeTitleModal() {
+        modal.style.display = "none";
+    }
+
+    // Cerrar el modal al hacer clic fuera
+    window.onclick = function(event) {
+        if (event.target == modal) {
+            closeTitleModal();
+        }
+    }
+
+    // Función de cambio de vista (sin cambios)
     function cambiarVista(vista) {
         const divActivos = document.getElementById('vista-activos');
         const divInactivos = document.getElementById('vista-inactivos');
@@ -139,17 +166,13 @@
         if (vista === 'activos') {
             divActivos.style.display = 'block';
             divInactivos.style.display = 'none';
-            btnActivos.classList.remove('btn-secondary');
-            btnActivos.classList.add('btn-primary');
-            btnInactivos.classList.remove('btn-primary');
-            btnInactivos.classList.add('btn-secondary');
+            btnActivos.classList.replace('btn-secondary', 'btn-primary');
+            btnInactivos.classList.replace('btn-primary', 'btn-secondary');
         } else {
             divActivos.style.display = 'none';
             divInactivos.style.display = 'block';
-            btnActivos.classList.remove('btn-primary');
-            btnActivos.classList.add('btn-secondary');
-            btnInactivos.classList.remove('btn-secondary');
-            btnInactivos.classList.add('btn-primary');
+            btnActivos.classList.replace('btn-primary', 'btn-secondary');
+            btnInactivos.classList.replace('btn-secondary', 'btn-primary');
         }
     }
 </script>
