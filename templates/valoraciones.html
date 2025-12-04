@@ -20,7 +20,7 @@
 
     <div style="margin-bottom: 20px; display: flex; gap: 10px;">
         <button onclick="cambiarVista('activos')" id="btn-activos" class="btn btn-primary">
-            <i class="fas fa-star"></i> Valoraciones Activas
+            <i class="fas fa-film"></i> Títulos con Reseñas
         </button>
         <button onclick="cambiarVista('inactivos')" id="btn-inactivos" class="btn btn-secondary">
             <i class="fas fa-trash-alt"></i> Papelera
@@ -28,65 +28,56 @@
     </div>
 
     <div id="vista-activos">
-        <div class="table-container">
-            <h3><i class="fas fa-comments"></i> Reseñas Publicadas</h3> <br><br>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Usuario</th>
-                        <th>Título</th>
-                        <th>Puntuación</th>
-                        <th>Comentario</th>
-                        <th>Fecha</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if valoraciones_activas %}
-                        {% for valoracion in valoraciones_activas %}
-                        <tr>
-                            <td>{{ valoracion.id_valoracion }}</td>
-                            <td>{{ usuarios_dict.get(valoracion.id_usuario_FK).nombre if usuarios_dict.get(valoracion.id_usuario_FK) else 'N/A' }}</td>
-                            <td>{{ titulos_dict.get(valoracion.id_titulo_FK).titulo if titulos_dict.get(valoracion.id_titulo_FK) else 'N/A' }}</td>
-                            <td>
-                                <div style="display: flex; align-items: center; gap: 5px;">
-                                    {% set score = valoracion.puntuacion|int %}
-                                    <span style="white-space: nowrap;">
-                                        {% for i in range(1, 6) %}
-                                            <i class="fas fa-star" style="color: {% if i <= score %}#ffc107{% else %}#444{% endif %}; font-size: 0.9rem;"></i>
-                                        {% endfor %}
-                                    </span>
-                                    <span style="font-weight: bold; margin-left: 5px;">{{ score }}/5</span>
-                                </div>
-                            </td>
-                            <td>{{ valoracion.comentario[:50] }}{% if valoracion.comentario|length > 50 %}...{% endif %}</td>
-                            <td>{{ valoracion.fecha }}</td>
-                            <td class="actions-cell">
-                                <a href="/web/valoraciones/editar/{{ valoracion.id_valoracion }}" class="btn btn-warning btn-sm">
-                                    <i class="fas fa-edit"></i>
-                                </a>
-                                <a href="/web/valoraciones/eliminar/{{ valoracion.id_valoracion }}"
-                                   class="btn btn-danger btn-sm"
-                                   onclick="return confirm('¿Estás seguro de eliminar esta valoración?')">
-                                    <i class="fas fa-trash"></i>
-                                </a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="7" class="loading">No hay valoraciones activas</td>
-                        </tr>
-                    {% endif %}
-                </tbody>
-            </table>
+        <h3><i class="fas fa-comments"></i> Catálogo de Reseñas por Título</h3><br>
+
+        <div class="movie-grid">
+            {% if titulos_con_rating %}
+                {% for titulo_info in titulos_con_rating %}
+                {# Buscamos las valoraciones, manejando el caso donde la clave es string o int #}
+                {% set titulo_id_str = titulo_info.id_titulo | string %}
+                {% set valoraciones_titulo = valoraciones_por_titulo.get(titulo_id_str) or valoraciones_por_titulo.get(titulo_info.id_titulo) %}
+
+                {# El onclick ahora llama a una función JS simple que solo requiere el ID #}
+                <div class="movie-card" onclick="openModalById('{{ titulo_info.id_titulo }}')">
+                    <div class="movie-poster">
+                        <img src="{{ titulo_info.img_url }}" alt="{{ titulo_info.titulo }}">
+                    </div>
+                    <div class="movie-info">
+                        <h3 class="title-overflow">{{ titulo_info.titulo }}</h3>
+                        <div class="meta-info" style="justify-content: center; gap: 15px;">
+                            <div style="display: flex; align-items: center; gap: 5px; color: #ffc107;">
+                                {% set score = titulo_info.promedio_puntuacion | round(0, 'floor') | int %}
+                                <span style="white-space: nowrap;">
+                                    {% for i in range(1, 6) %}
+                                        <i class="fas fa-star" style="color: {% if i <= score %}#ffc107{% else %}#444{% endif %}; font-size: 1rem;"></i>
+                                    {% endfor %}
+                                </span>
+                            </div>
+                            <span style="font-weight: bold; margin-left: 5px; color: white;">
+                                {{ titulo_info.promedio_puntuacion }} / 5
+                            </span>
+                        </div>
+                        <p class="desc" style="text-align: center; color: #888;">
+                            {{ titulo_info.total_valoraciones }} Reseñas
+                        </p>
+                        <div class="card-actions" style="justify-content: center; border-top: none;">
+                             {# El botón también usa la función simplificada #}
+                             <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); openModalById('{{ titulo_info.id_titulo }}')">
+                                <i class="fas fa-search"></i> Ver Comentarios
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p>No hay títulos con valoraciones activas.</p>
+            {% endif %}
         </div>
     </div>
 
     <div id="vista-inactivos" style="display: none;">
         <div class="table-container" style="background: rgba(40, 40, 40, 0.6); border: 1px solid #444;">
-            <h3 style="color: #ccc;"><i class="fas fa-archive"></i> Valoraciones Eliminadas</h3>
+            <h3 style="color: #ccc;"><i class="fas fa-trash-alt"></i> Valoraciones Eliminadas</h3>
             <table class="data-table">
                 <thead>
                     <tr>
@@ -120,7 +111,7 @@
                             <td>{{ valoracion.comentario[:50] }}...</td>
                             <td>{{ valoracion.fecha }}</td>
                             <td class="actions-cell">
-                                <a href="/web/valoraciones/restaurar/{{ valoracion.id_valoracion }}" 
+                                <a href="/web/valoraciones/restaurar/{{ valoracion.id_valoracion }}"
                                    class="btn btn-success btn-sm"
                                    onclick="return confirm('¿Deseas restaurar esta valoración?')">
                                     <i class="fas fa-undo"></i> Restaurar
@@ -139,7 +130,117 @@
     </div>
 </div>
 
+
+<hr>
+
+
+{% for titulo_info in titulos_con_rating %}
+    {% set titulo_id_str = titulo_info.id_titulo | string %}
+    {# Accedemos a la lista de valoraciones para este título #}
+    {% set valoraciones_titulo = valoraciones_por_titulo.get(titulo_id_str) or valoraciones_por_titulo.get(titulo_info.id_titulo) %}
+
+    <div id="modal-{{ titulo_info.id_titulo }}" class="modal">
+        <div class="modal-content valoracion-modal-content">
+            <span class="close" onclick="closeModalById('{{ titulo_info.id_titulo }}')">&times;</span>
+            <div class="valoracion-details">
+                <div class="title-poster-container">
+                    <img src="{{ titulo_info.img_url }}" alt="Poster">
+                </div>
+                <div class="title-info-content">
+                    <h2 >{{ titulo_info.titulo }}</h2>
+                    <div class="modal-meta" style="justify-content: flex-start; margin-bottom: 30px;">
+                        <div style="color: #ffc107; font-size: 1.5rem;">
+                            {# Renderizado de estrellas de promedio #}
+                            {% set rounded_score = titulo_info.promedio_puntuacion | round(0, 'floor') | int %}
+                            {% for i in range(1, 6) %}
+                                <i class="fas fa-star" style="font-size: 1.2rem; color: {% if i <= rounded_score %}#ffc107{% else %}#444{% endif %};"></i>
+                            {% endfor %}
+                        </div>
+                        <span style="font-weight: bold; color: white; margin-left: 10px;">
+                            {{ titulo_info.promedio_puntuacion }} / 5 ({{ titulo_info.total_valoraciones }} Reseñas)
+                        </span>
+                    </div>
+
+                    <div id="comments-container-{{ titulo_info.id_titulo }}">
+                        <h3><i class="fas fa-comment-dots"></i> Comentarios Detallados</h3><br>
+
+                        {# Bucle de Jinja para renderizar todos los comentarios #}
+                        {% if valoraciones_titulo %}
+                            {% for val in valoraciones_titulo %}
+                            {% set val_score = val.puntuacion | round(0, 'floor') | int %}
+
+                            <div class="comment-card">
+                                <div class="comment-header">
+                                    {# Foto del Usuario (usando el path de Jinja) #}
+                                    <img src="{{ val.usuario_img }}" alt="{{ val.usuario_nombre }}" class="user-comment-img">
+                                    <div class="comment-user-info">
+                                        {# Nombre del Usuario #}
+                                        <span class="comment-user-name">{{ val.usuario_nombre }}</span>
+                                        {# Puntuación y Estrellas #}
+                                        <span class="comment-score-stars">
+                                            {% for i in range(1, 6) %}
+                                                <i class="fas fa-star" style="color: {% if i <= val_score %}#ffc107{% else %}#444{% endif %}; font-size: 0.8rem;"></i>
+                                            {% endfor %}
+                                             ({{ val.puntuacion }} / 5)
+                                        </span>
+                                    </div>
+                                    <div class="comment-actions">
+                                        {# Botones de Editar y Eliminar (totalmente funcionales) #}
+                                        <a href="/web/valoraciones/editar/{{ val.id_valoracion }}" class="btn btn-warning btn-sm" onclick="event.stopPropagation();"><i class="fas fa-pen"></i></a>
+                                        <a href="/web/valoraciones/eliminar/{{ val.id_valoracion }}" class="btn btn-danger btn-sm" onclick="event.stopPropagation(); return confirm('¿Eliminar esta valoración?')"><i class="fas fa-trash"></i></a>
+                                    </div>
+                                </div>
+                                {# Comentario #}
+                                <p class="comment-body">{{ val.comentario }}</p>
+                                <span class="comment-date">Fecha: {{ val.fecha }}</span>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p style="color: #888;">No hay comentarios activos para este título.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endfor %}
+
+<hr>
+
+
+
 <script>
+
+
+    function openModalById(id) {
+        // Detener la propagación si se llama desde un elemento dentro de la tarjeta
+        if (event && event.stopPropagation) {
+            event.stopPropagation();
+        }
+        // Simplemente cambia el estilo para mostrar el modal pre-renderizado por Jinja
+        const modal = document.getElementById(`modal-${id}`);
+        if (modal) {
+            modal.style.display = "block";
+        }
+    }
+
+    function closeModalById(id) {
+        // Simplemente cambia el estilo para ocultar el modal
+        const modal = document.getElementById(`modal-${id}`);
+        if (modal) {
+            modal.style.display = "none";
+        }
+    }
+
+    // Cerrar el modal al hacer clic fuera
+    window.onclick = function(event) {
+        // En lugar de una sola variable de modal, cerramos cualquier elemento con la clase 'modal'
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = "none";
+        }
+    }
+
+    // Función de cambio de vista (se mantiene igual)
     function cambiarVista(vista) {
         const divActivos = document.getElementById('vista-activos');
         const divInactivos = document.getElementById('vista-inactivos');
@@ -149,17 +250,13 @@
         if (vista === 'activos') {
             divActivos.style.display = 'block';
             divInactivos.style.display = 'none';
-            btnActivos.classList.remove('btn-secondary');
-            btnActivos.classList.add('btn-primary');
-            btnInactivos.classList.remove('btn-primary');
-            btnInactivos.classList.add('btn-secondary');
+            btnActivos.classList.replace('btn-secondary', 'btn-primary');
+            btnInactivos.classList.replace('btn-primary', 'btn-secondary');
         } else {
             divActivos.style.display = 'none';
             divInactivos.style.display = 'block';
-            btnActivos.classList.remove('btn-primary');
-            btnActivos.classList.add('btn-secondary');
-            btnInactivos.classList.remove('btn-secondary');
-            btnInactivos.classList.add('btn-primary');
+            btnActivos.classList.replace('btn-primary', 'btn-secondary');
+            btnInactivos.classList.replace('btn-secondary', 'btn-primary');
         }
     }
 </script>

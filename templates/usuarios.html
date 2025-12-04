@@ -32,12 +32,9 @@
             {% if usuarios_activos %}
                 {% for usuario in usuarios_activos %}
                 {% set default_img = '/static/img/user-placeholder.png' %}
-                <div class="user-card" onclick="openUserModal(
-                    '{{ usuario.nombre | safe }}',
-                    '{{ usuario.correo | safe }}',
-                    '{{ usuario.img if usuario.img else default_img }}',
-                    '{{ usuario.id_usuario }}'
-                )">
+
+                {# AHORA SOLO LLAMAMOS A JS PARA ABRIR EL MODAL POR SU ID #}
+                <div class="user-card" onclick="openUserModalById('{{ usuario.id_usuario }}')">
                     <img src="{{ usuario.img if usuario.img else default_img }}"
                          class="user-img-circle"
                          alt="{{ usuario.nombre }}">
@@ -95,66 +92,71 @@
     </div>
 </div>
 
-<div id="userModal" class="modal">
-    <div class="modal-content user-modal">
-        <span class="close" onclick="closeUserModal()">&times;</span>
-        <div class="user-details">
-            <img id="modal-user-img" src="" alt="Foto de perfil" class="user-img-circle" style="width: 120px; height: 120px; border-width: 5px;">
-            <div class="user-info-content">
-                <h2 id="modal-user-name"></h2>
-                <div class="user-meta" id="modal-user-email"></div>
+{# ---------------------------------------------------------------- #}
+{# MODALES PRE-RENDERIZADOS CON JINJA2 (SOLUCIÓN SERVER-SIDE)        #}
+{# ---------------------------------------------------------------- #}
 
-                <p class="user-summary">
-                    <i class="fas fa-star" style="color: var(--warning);"></i>
-                    Perfil dedicado a explorar las mejores series y películas de la semana. ¡Un verdadero cinéfilo en CineHub!
-                </p>
+{% set default_img = '/static/img/user-placeholder.png' %}
+{% for usuario in usuarios_activos %}
+    {# Renderizamos un modal completo para cada usuario con su ID único #}
+    <div id="userModal-{{ usuario.id_usuario }}" class="modal">
+        <div class="modal-content user-modal">
+            {# Función JS simplificada para cerrar por ID #}
+            <span class="close" onclick="closeUserModalById('{{ usuario.id_usuario }}')">&times;</span>
+            <div class="user-details">
+                <img id="modal-user-img-{{ usuario.id_usuario }}"
+                     src="{{ usuario.img if usuario.img else default_img }}"
+                     alt="Foto de perfil"
+                     class="user-img-circle"
+                     style="width: 120px; height: 120px; border-width: 5px;">
+                <div class="user-info-content">
+                    {# Datos llenados directamente por Jinja2 #}
+                    <h2 id="modal-user-name-{{ usuario.id_usuario }}">{{ usuario.nombre }}</h2>
+                    <div class="user-meta" id="modal-user-email-{{ usuario.id_usuario }}">Correo: {{ usuario.correo }}</div>
 
-                <div class="modal-actions-user">
-                    <a id="modal-edit-btn" href="#" class="btn btn-warning"><i class="fas fa-pen"></i> Editar</a>
-                    <a id="modal-delete-btn" href="#" class="btn btn-danger" onclick="return confirm('¿Estás seguro de eliminar a este usuario?')"><i class="fas fa-trash"></i> Eliminar</a>
+
+                    <div class="modal-actions-user">
+                        {# Enlaces de acción configurados directamente por Jinja2 #}
+                        <a href="/web/usuarios/editar/{{ usuario.id_usuario }}" class="btn btn-warning"><i class="fas fa-pen"></i> Editar</a>
+                        <a href="/web/usuarios/eliminar/{{ usuario.id_usuario }}" class="btn btn-danger" onclick="return confirm('¿Estás seguro de eliminar a este usuario?')"><i class="fas fa-trash"></i> Eliminar</a>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
+{% endfor %}
+
 
 <script>
-    // Variable global para el modal
-    const modal = document.getElementById('userModal');
-
-    function openUserModal(nombre, correo, imgUrl, id_usuario) {
-        // Obtenemos los elementos del modal
-        const modalName = document.getElementById('modal-user-name');
-        const modalImg = document.getElementById('modal-user-img');
-        const modalEmail = document.getElementById('modal-user-email');
-        const modalEditBtn = document.getElementById('modal-edit-btn');
-        const modalDeleteBtn = document.getElementById('modal-delete-btn');
-
-        // Llenamos el contenido del modal
-        modalName.textContent = nombre;
-        modalImg.src = imgUrl;
-        modalEmail.textContent = "Correo: " + correo;
-
-        // Configuramos los enlaces de acción con el ID correcto
-        modalEditBtn.href = `/web/usuarios/editar/${id_usuario}`;
-        modalDeleteBtn.href = `/web/usuarios/eliminar/${id_usuario}`;
-
-        // Hacemos visible el modal
-        modal.style.display = "block";
-    }
-
-    function closeUserModal() {
-        modal.style.display = "none";
-    }
-
-    // Cerrar el modal al hacer clic fuera
-    window.onclick = function(event) {
-        if (event.target == modal) {
-            closeUserModal();
+    function openUserModalById(id_usuario) {
+        // Detener la propagación para evitar activar eventos no deseados
+        if (event && event.stopPropagation) {
+            event.stopPropagation();
+        }
+        // Simplemente cambia el estilo para mostrar el modal pre-renderizado
+        const modal = document.getElementById(`userModal-${id_usuario}`);
+        if (modal) {
+            modal.style.display = "block";
         }
     }
 
-    // Función de cambio de vista (mantener la lógica original)
+    function closeUserModalById(id_usuario) {
+        // Simplemente cambia el estilo para ocultar el modal
+        const modal = document.getElementById(`userModal-${id_usuario}`);
+        if (modal) {
+            modal.style.display = "none";
+        }
+    }
+
+    // Cerrar el modal al hacer clic fuera (mejorado para cerrar CUALQUIER modal)
+    window.onclick = function(event) {
+        // Cerramos cualquier elemento que tenga la clase 'modal' si se hace clic fuera de su contenido
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = "none";
+        }
+    }
+
+    // Función de cambio de vista (se mantiene igual)
     function cambiarVista(vista) {
         // Referencias a las secciones
         const divActivos = document.getElementById('vista-activos');

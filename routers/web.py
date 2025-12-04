@@ -243,18 +243,77 @@ async def restaurar_titulo_web(id_titulo: int, session: Session = Depends(get_se
 
 @router.get("/valoraciones", response_class=HTMLResponse)
 async def pagina_valoraciones(request: Request, session: Session = Depends(get_session)):
-    activas = session.exec(select(Valoracion).where(Valoracion.is_active == True)).all()
+    # Se obtienen todos los usuarios y títulos para la "Papelera" y para mapear en el modal
     inactivas = session.exec(select(Valoracion).where(Valoracion.is_active == False)).all()
-    usuarios = session.exec(select(Usuario)).all()
-    titulos = session.exec(select(PeliculaSerie)).all()
-    usuarios_dict = {u.id_usuario: u for u in usuarios}
-    titulos_dict = {t.id_titulo: t for t in titulos}
+    usuarios_dict = {u.id_usuario: u for u in session.exec(select(Usuario)).all()}
+    titulos_dict = {t.id_titulo: t for t in session.exec(select(PeliculaSerie)).all()}
 
+    # --- 2. Títulos con Valoraciones Activas (Datos Agregados) ---
+    # Consulta para obtener título, imagen y la puntuación promedio (SIN REDONDEAR AQUI)
+    ratings_grouped_by_title_query = (
+        select(
+            PeliculaSerie.id_titulo,
+            PeliculaSerie.titulo,
+            PeliculaSerie.img.label("img_url"),
+            func.avg(Valoracion.puntuacion).label("promedio_puntuacion"),  # Eliminado func.round para evitar error
+            func.count(Valoracion.id_valoracion).label("total_valoraciones")
+        )
+        .join(Valoracion, PeliculaSerie.id_titulo == Valoracion.id_titulo_FK)
+        .where(PeliculaSerie.is_active == True, Valoracion.is_active == True)
+        .group_by(PeliculaSerie.id_titulo, PeliculaSerie.titulo, PeliculaSerie.img)
+        .order_by(desc("promedio_puntuacion"))
+    )
+
+    titulos_con_rating_results = session.exec(ratings_grouped_by_title_query).all()
+
+    # Convertir los resultados agregados a una lista de diccionarios para el template
+    titulos_con_rating = []
+    for row in titulos_con_rating_results:
+        # REDONDEO EN PYTHON para evitar el error de enlace de parámetros SQL
+        promedio_puntuacion_rounded = round(row[3], 1) if row[3] is not None else 0.0
+
+        titulos_con_rating.append({
+            "id_titulo": row[0],
+            "titulo": row[1],
+            "img_url": row[2] if row[2] else '/static/img/placeholder_movie.jpg',
+            "promedio_puntuacion": promedio_puntuacion_rounded,  # Se usa el valor redondeado
+            "total_valoraciones": row[4]
+        })
+
+    # --- 3. Todas las Valoraciones Activas Agrupadas por Título (para el Modal) ---
+    all_active_valoraciones = session.exec(select(Valoracion).where(Valoracion.is_active == True)).all()
+
+    # Agrupar las valoraciones por título en Python, inyectando datos de usuario para el modal
+    valoraciones_por_titulo = {}
+    for val in all_active_valoraciones:
+        title_id = val.id_titulo_FK
+        if title_id not in valoraciones_por_titulo:
+            valoraciones_por_titulo[title_id] = []
+
+        # Obtener información de usuario del diccionario (eficiente)
+        usuario_info = usuarios_dict.get(val.id_usuario_FK)
+
+        valoraciones_por_titulo[title_id].append({
+            "id_valoracion": val.id_valoracion,
+            "puntuacion": val.puntuacion,
+            "comentario": val.comentario,
+            "fecha": val.fecha.strftime("%Y-%m-%d"),
+            "usuario_nombre": usuario_info.nombre if usuario_info else 'N/A',
+            "usuario_img": usuario_info.img if usuario_info and usuario_info.img else '/static/img/user-placeholder.png',
+            "id_usuario_FK": val.id_usuario_FK
+        })
+
+    # --- 4. Renderizar Template ---
     return templates.TemplateResponse("valoraciones.html", {
-        "request": request, "valoraciones_activas": activas, "valoraciones_inactivas": inactivas,
-        "usuarios_dict": usuarios_dict, "titulos_dict": titulos_dict
+        "request": request,
+        "titulos_con_rating": titulos_con_rating,
+        "valoraciones_por_titulo": valoraciones_por_titulo,
+        "valoraciones_inactivas": inactivas,
+        "usuarios_dict": usuarios_dict,
+        "titulos_dict": titulos_dict,
+        "placeholder_movie_img": '/static/img/placeholder_movie.jpg',
+        "placeholder_user_img": '/static/img/user-placeholder.png'
     })
-
 
 @router.get("/valoraciones/crear", response_class=HTMLResponse)
 async def pagina_crear_valoracion(request: Request, session: Session = Depends(get_session)):

@@ -1070,3 +1070,144 @@ select option {
     justify-content: center;
     margin-top: 20px;
 }
+
+
+.valoracion-modal-content {
+    max-width: 900px;
+    margin-top: 50px;
+}
+
+.valoracion-details {
+    display: flex;
+    gap: 30px;
+}
+
+.valoracion-details .title-poster-container {
+    flex: 0 0 250px;
+    height: 380px;
+}
+
+.valoracion-details .title-info-content {
+    flex-grow: 1;
+}
+
+.valoracion-details .title-info-content h2 {
+    font-size: 2rem;
+    color: var(--primary);
+    margin-bottom: 5px;
+}
+
+/* Comentarios */
+#modal-val-comments-container h3 {
+    color: #f5f5f1;
+    border-bottom: 1px solid #333;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.comment-card {
+    background: #141414;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    border-left: 4px solid var(--primary);
+}
+
+.comment-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 10px;
+    justify-content: space-between;
+}
+
+.user-comment-img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #555;
+}
+
+.comment-user-info {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.comment-user-name {
+    font-weight: bold;
+    color: var(--light);
+}
+
+.comment-score-stars {
+    font-size: 0.9rem;
+    color: #ccc;
+}
+
+.comment-actions {
+    display: flex;
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+.comment-body {
+    color: #ccc;
+    line-height: 1.4;
+    /* Ajuste para el margen */
+    margin-left: 55px;
+    margin-bottom: 10px;
+    word-wrap: break-word;
+}
+
+.comment-date {
+    display: block;
+    text-align: right;
+    font-size: 0.75rem;
+    color: var(--gray);
+}
+
+.title-overflow {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Responsive para el modal de detalles */
+@media (max-width: 768px) {
+    .valoracion-details {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .valoracion-details .title-poster-container {
+        flex: 1 1 auto;
+        width: 100%;
+        max-width: 250px;
+        margin: 0 auto 20px;
+    }
+
+    .comment-header {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .comment-user-info {
+        text-align: left;
+    }
+
+    .comment-actions {
+        order: 3;
+        width: 100%;
+        justify-content: center;
+        margin-top: 10px;
+    }
+
+    .comment-body {
+        margin-left: 0;
+        text-align: left;
+    }
+}
