@@ -10,7 +10,7 @@ class Usuario(SQLModel, table=True):
     clave: str
     is_active: bool = Field(default=True)
     deleted_at: Optional[datetime] = Field(default=None, nullable=True)
-
+    img: Optional[str] = Field(default=None, description="User image")
     valoraciones: List["Valoracion"] = Relationship(back_populates="usuario")
     rutinas: List["Rutina"] = Relationship(back_populates="usuario")
 
@@ -24,6 +24,7 @@ class PeliculaSerie(SQLModel, table=True):
     descripcion: str
     is_active: bool = Field(default=True)
     deleted_at: Optional[datetime] = Field(default=None, nullable=True)
+    img: Optional[str] = Field(default=None, description="User image")
 
     valoraciones: List["Valoracion"] = Relationship(back_populates="titulo")
     rutinas: List["Rutina"] = Relationship(back_populates="titulo")
@@ -59,7 +60,7 @@ class Rutina(SQLModel, table=True):
     titulo: Optional["PeliculaSerie"] = Relationship(back_populates="rutinas")
 
 
-# Schemas para crear entidades sin ID (para el POST)
+
 class UsuarioCreate(SQLModel):
     nombre: str
     correo: str

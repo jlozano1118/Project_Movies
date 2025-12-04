@@ -1,14 +1,18 @@
-﻿from fastapi import APIRouter, Request, Depends, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
+﻿
+
+from fastapi import APIRouter, Form, File, UploadFile, Depends, HTTPException,Request
+from fastapi.responses import RedirectResponse,HTMLResponse
 from sqlmodel import Session, select
-from datetime import date, datetime
-import calendar # IMPORTANTE: Para generar el calendario
+from fastapi.templating import Jinja2Templates
+from utils.db import get_session
+from supa.supabase import upload_to_bucket
+from utils.security import get_password_hash
+from data.models import Usuario,PeliculaSerie, Valoracion, Rutina
+from datetime import date, datetime,timedelta
+import calendar
 from typing import Optional
 
-from utils.db import get_session
-from utils.security import get_password_hash
-from data.models import Usuario, PeliculaSerie, Valoracion, Rutina
+
 
 router = APIRouter(
     prefix="/web",
@@ -31,13 +35,46 @@ async def pagina_usuarios(request: Request, session: Session = Depends(get_sessi
 async def pagina_crear_usuario(request: Request):
     return templates.TemplateResponse("usuario_form.html", {"request": request, "accion": "Crear", "usuario": None})
 
+
+
 @router.post("/usuarios/crear")
-async def crear_usuario_web(nombre: str = Form(...), correo: str = Form(...), clave: str = Form(...), session: Session = Depends(get_session)):
+async def crear_usuario_web(
+    nombre: str = Form(...),
+    correo: str = Form(...),
+    clave: str = Form(...),
+    img: UploadFile = File(None),
+    session: Session = Depends(get_session)
+):
+
     clave_hash = get_password_hash(clave)
-    nuevo_usuario = Usuario(nombre=nombre, correo=correo, clave=clave_hash)
-    session.add(nuevo_usuario)
-    session.commit()
-    return RedirectResponse(url="/web/usuarios?mensaje=Usuario creado correctamente", status_code=303)
+
+
+    img_url = None
+    if img is not None:
+        try:
+            img_url = await upload_to_bucket(img)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Error subiendo imagen: {str(e)}")
+
+
+    try:
+        nuevo_usuario = Usuario(
+            nombre=nombre,
+            correo=correo,
+            clave=clave_hash,
+            img=img_url
+        )
+
+        session.add(nuevo_usuario)
+        session.commit()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return RedirectResponse(
+        url="/web/usuarios?mensaje=Usuario creado correctamente",
+        status_code=303
+    )
+
 
 @router.get("/usuarios/editar/{id_usuario}", response_class=HTMLResponse)
 async def pagina_editar_usuario(id_usuario: int, request: Request, session: Session = Depends(get_session)):
@@ -88,11 +125,48 @@ async def pagina_crear_titulo(request: Request):
     return templates.TemplateResponse("titulo_form.html", {"request": request, "accion": "Crear", "titulo": None})
 
 @router.post("/titulos/crear")
-async def crear_titulo_web(titulo: str = Form(...), genero: str = Form(...), anio_estreno: int = Form(...), duracion: int = Form(...), descripcion: str = Form(...), session: Session = Depends(get_session)):
-    nuevo_titulo = PeliculaSerie(titulo=titulo, genero=genero, anio_estreno=anio_estreno, duracion=duracion, descripcion=descripcion)
-    session.add(nuevo_titulo)
-    session.commit()
-    return RedirectResponse(url="/web/titulos?mensaje=Título creado correctamente", status_code=303)
+async def crear_titulo_web(
+    titulo: str = Form(...),
+    genero: str = Form(...),
+    anio_estreno: int = Form(...),
+    duracion: int = Form(...),
+    descripcion: str = Form(...),
+    img: UploadFile = File(None),
+    session: Session = Depends(get_session)
+):
+
+
+    img_url = None
+    if img is not None:
+        try:
+            img_url = await upload_to_bucket(img)
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Error subiendo imagen: {str(e)}"
+            )
+
+
+    try:
+        nuevo_titulo = PeliculaSerie(
+            titulo=titulo,
+            genero=genero,
+            anio_estreno=anio_estreno,
+            duracion=duracion,
+            descripcion=descripcion,
+            img=img_url
+        )
+
+        session.add(nuevo_titulo)
+        session.commit()
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return RedirectResponse(
+        url="/web/titulos?mensaje=Título creado correctamente",
+        status_code=303
+    )
 
 @router.get("/titulos/editar/{id_titulo}", response_class=HTMLResponse)
 async def pagina_editar_titulo(id_titulo: int, request: Request, session: Session = Depends(get_session)):
@@ -208,14 +282,30 @@ async def restaurar_valoracion_web(id_valoracion: int, session: Session = Depend
 async def pagina_rutinas(request: Request, session: Session = Depends(get_session)):
     # 1. Obtener todas las rutinas activas
     rutinas = session.exec(select(Rutina).where(Rutina.is_active == True)).all()
-    
-    # 2. Organizar rutinas por fecha (Key: "YYYY-MM-DD", Value: Lista de rutinas)
+
+    # =========================================================================
+    # CORRECCIÓN AQUÍ: Rellenar todos los días del rango
+    # =========================================================================
     rutinas_map = {}
+
     for r in rutinas:
-        fecha_str = r.fecha_inicio.strftime("%Y-%m-%d")
-        if fecha_str not in rutinas_map:
-            rutinas_map[fecha_str] = []
-        rutinas_map[fecha_str].append(r)
+        fecha_cursor = r.fecha_inicio
+        fecha_fin = r.fecha_fin
+
+        # Bucle: Mientras la fecha actual sea menor o igual a la fecha fin
+        while fecha_cursor <= fecha_fin:
+            fecha_str = fecha_cursor.strftime("%Y-%m-%d")
+
+            # Si la clave no existe, crear la lista para ese día
+            if fecha_str not in rutinas_map:
+                rutinas_map[fecha_str] = []
+
+            # Agregar la rutina a ese día
+            rutinas_map[fecha_str].append(r)
+
+            # Avanzar al siguiente día
+            fecha_cursor += timedelta(days=1)
+    # =========================================================================
 
     # 3. Diccionarios para nombres
     usuarios = session.exec(select(Usuario)).all()
@@ -224,24 +314,42 @@ async def pagina_rutinas(request: Request, session: Session = Depends(get_sessio
     titulos_dict = {t.id_titulo: t for t in titulos}
 
     # 4. Generar Calendario del Mes Actual
+    # NOTA: Aquí podrías capturar query params ?year=2023&month=12 para navegar
+    # Pero lo dejaremos como lo tienes (mes actual) para no romper nada más.
     hoy = date.today()
-    cal = calendar.monthcalendar(hoy.year, hoy.month)
-    # cal es una matriz [[0,0,1,2,3...], [4,5,6...]]
-    
-    # Nombres de meses en español
-    meses = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-    nombre_mes = f"{meses[hoy.month]} De {hoy.year}"
+
+    # Variables de navegación básicas para que no falle el template
+    # (El template espera prev_year, next_year, etc. según el HTML que enviaste antes)
+    year = hoy.year
+    month = hoy.month
+
+    cal = calendar.monthcalendar(year, month)
+
+    meses = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre",
+             "Noviembre", "Diciembre"]
+    nombre_mes = f"{meses[month]} De {year}"
+
+    # Calculamos mes previo y siguiente para los botones
+    prev_month = month - 1 if month > 1 else 12
+    prev_year = year if month > 1 else year - 1
+    next_month = month + 1 if month < 12 else 1
+    next_year = year if month < 12 else year + 1
 
     return templates.TemplateResponse("rutinas.html", {
-        "request": request, 
-        "calendar_weeks": cal, # La matriz de semanas
-        "rutinas_map": rutinas_map, # Las rutinas organizadas
-        "usuarios_dict": usuarios_dict, 
+        "request": request,
+        "calendar_weeks": cal,
+        "rutinas_map": rutinas_map,  # Ahora lleva los rangos completos
+        "usuarios_dict": usuarios_dict,
         "titulos_dict": titulos_dict,
-        "year": hoy.year,
-        "month": hoy.month,
+        "year": year,
+        "month": month,
         "nombre_mes": nombre_mes,
-        "hoy_dia": hoy.day # Para resaltar el día actual
+        "hoy_dia": hoy.day,
+        # Agregamos estas variables que tu HTML anterior pedía en los botones < >
+        "prev_year": prev_year,
+        "prev_month": prev_month,
+        "next_year": next_year,
+        "next_month": next_month
     })
 
 @router.get("/rutinas/crear", response_class=HTMLResponse)

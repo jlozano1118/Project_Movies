@@ -38,6 +38,7 @@
                         <th>Género</th>
                         <th>Año</th>
                         <th>Duración</th>
+                        <th>Imagen</th>
                         <th>Estado</th>
                         <th>Acciones</th>
                     </tr>
@@ -51,6 +52,11 @@
                             <td>{{ titulo.genero }}</td>
                             <td>{{ titulo.anio_estreno }}</td>
                             <td>{{ titulo.duracion }} min</td>
+                             <td class="img-cell">
+                                <img src="{{ titulo.img if titulo.img else '/static/img/user-placeholder.png' }}"
+                                     class="user-img"
+                                     alt="imagen">
+                            </td>
                             <td>
                                 <span class="badge badge-active">Activo</span>
                             </td>

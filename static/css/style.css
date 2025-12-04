@@ -813,3 +813,56 @@ select option {
     color: white;
     border-color: var(--primary);
 }
+
+
+
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+    padding: 12px;
+    text-align: center;
+    vertical-align: middle;
+    border-bottom: 1px solid #333;
+}
+
+.data-table th {
+    background-color: #2c2c2c;
+    color: white;
+}
+
+
+
+
+.img-cell {
+    width: 80px !important;
+    text-align: center;
+    vertical-align: middle;
+}
+
+
+.user-img {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+    margin: 0 auto;
+}
+
+
+
+
+.actions-cell {
+    white-space: nowrap;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.actions-cell .btn {
+    margin: 2px;
+}

@@ -37,26 +37,38 @@
                         <th>Nombre</th>
                         <th>Correo</th>
                         <th>Estado</th>
+                        <th>Imagen</th>
                         <th>Acciones</th>
+
                     </tr>
                 </thead>
-                <tbody>
+               <tbody>
                     {% if usuarios_activos %}
                         {% for usuario in usuarios_activos %}
                         <tr>
                             <td>{{ usuario.id_usuario }}</td>
                             <td>{{ usuario.nombre }}</td>
                             <td>{{ usuario.correo }}</td>
+
                             <td>
                                 <span class="badge badge-active">Activo</span>
                             </td>
+
+
+                            <td class="img-cell">
+                                <img src="{{ usuario.img if usuario.img else '/static/img/user-placeholder.png' }}"
+                                     class="user-img"
+                                     alt="imagen">
+                            </td>
+
                             <td class="actions-cell">
                                 <a href="/web/usuarios/editar/{{ usuario.id_usuario }}" class="btn btn-warning btn-sm">
                                     <i class="fas fa-edit"></i>
                                 </a>
+
                                 <a href="/web/usuarios/eliminar/{{ usuario.id_usuario }}"
                                    class="btn btn-danger btn-sm"
-                                   onclick="return confirm('¿Estás seguro de desactivar este usuario?')">
+                                   onclick="return confirm('¿Estás seguro?')">
                                     <i class="fas fa-trash"></i>
                                 </a>
                             </td>
@@ -64,10 +76,11 @@
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="5" class="loading">No hay usuarios activos</td>
+                            <td colspan="6" class="loading">No hay usuarios activos</td>
                         </tr>
                     {% endif %}
                 </tbody>
+
             </table>
         </div>
     </div>
@@ -92,6 +105,7 @@
                             <td>{{ usuario.id_usuario }}</td>
                             <td>{{ usuario.nombre }}</td>
                             <td>{{ usuario.correo }}</td>
+
                             <td>
                                 <span class="badge badge-inactive">Inactivo</span>
                             </td>

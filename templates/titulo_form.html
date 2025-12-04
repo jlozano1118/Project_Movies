@@ -15,7 +15,7 @@
             </a>
         </div>
 
-        <form method="post" class="data-form">
+        <form method="post"  class="data-form" enctype="multipart/form-data">
             <div class="form-group">
                 <label><i class="fas fa-heading"></i> Título:</label>
                 <input type="text" name="titulo" value="{% if titulo %}{{ titulo.titulo }}{% endif %}" required>
@@ -38,6 +38,11 @@
                     <input type="number" name="duracion" value="{% if titulo %}{{ titulo.duracion }}{% endif %}"
                            min="1" required>
                 </div>
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-envelope"></i> Imagen:</label>
+                <input type="file" name="img" value="{% if titulo %}{{ titulo.img }}{% endif %}" required>
             </div>
 
             <div class="form-group">

@@ -15,7 +15,7 @@
             </a>
         </div>
 
-        <form method="post" class="data-form">
+        <form method="post" class="data-form" enctype="multipart/form-data">
             <div class="form-group">
                 <label><i class="fas fa-user"></i> Nombre:</label>
                 <input type="text" name="nombre" value="{% if usuario %}{{ usuario.nombre }}{% endif %}" required>
@@ -24,6 +24,10 @@
             <div class="form-group">
                 <label><i class="fas fa-envelope"></i> Correo:</label>
                 <input type="email" name="correo" value="{% if usuario %}{{ usuario.correo }}{% endif %}" required>
+            </div>
+            <div class="form-group">
+                <label><i class="fas fa-envelope"></i> Imagen:</label>
+                <input type="file" name="img" value="{% if usuario %}{{ usuario.img }}{% endif %}" required>
             </div>
 
             <div class="form-group">
