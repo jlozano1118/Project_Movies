@@ -618,46 +618,85 @@ async def eliminar_rutina_web(id_rutina: int, session: Session = Depends(get_ses
 
 @router.get("/estadisticas", response_class=HTMLResponse)
 async def pagina_estadisticas(request: Request, session: Session = Depends(get_session)):
-    # 1. Conteo General
+    # 1. Conteo General y Promedio Global (Nuevos KPIs)
     n_usuarios = session.exec(select(func.count(Usuario.id_usuario)).where(Usuario.is_active == True)).one()
     n_titulos = session.exec(select(func.count(PeliculaSerie.id_titulo)).where(PeliculaSerie.is_active == True)).one()
     n_valoraciones = session.exec(
         select(func.count(Valoracion.id_valoracion)).where(Valoracion.is_active == True)).one()
 
-    # 2. Películas mejor valoradas (Top Rated)
-    # Hacemos un Join para obtener el título y el promedio de sus valoraciones
+    # NUEVO KPI: Total Rutinas
+    n_rutinas = session.exec(select(func.count(Rutina.id_rutina)).where(Rutina.is_active == True)).one()
+
+    # NUEVO KPI: Promedio Global
+    promedio_global_query = select(func.avg(Valoracion.puntuacion)).where(Valoracion.is_active == True)
+    promedio_global_raw = session.exec(promedio_global_query).one_or_none()
+    promedio_global = round(promedio_global_raw, 1) if promedio_global_raw is not None else 0.0
+
+    # 2. Películas mejor valoradas (Top Rated) - Se mantiene
     top_rated_query = (
         select(PeliculaSerie.titulo, func.avg(Valoracion.puntuacion).label("promedio"))
         .join(Valoracion)
-        .where(PeliculaSerie.is_active == True)
+        .where(PeliculaSerie.is_active == True, Valoracion.is_active == True)
         .group_by(PeliculaSerie.id_titulo)
         .order_by(desc("promedio"))
         .limit(5)
     )
     top_rated_results = session.exec(top_rated_query).all()
-
-    # Formatear para Chart.js
     top_rated_labels = [r[0] for r in top_rated_results]
     top_rated_data = [round(r[1], 1) for r in top_rated_results]
 
-    # 3. Distribución por Género
+    # 3. Distribución por Género (Título Count) - Se mantiene (ordenado por conteo)
     genre_query = (
         select(PeliculaSerie.genero, func.count(PeliculaSerie.id_titulo))
         .where(PeliculaSerie.is_active == True)
         .group_by(PeliculaSerie.genero)
+        .order_by(desc(func.count(PeliculaSerie.id_titulo)))
     )
     genre_results = session.exec(genre_query).all()
-
     genre_labels = [r[0] for r in genre_results]
     genre_data = [r[1] for r in genre_results]
 
+    # NUEVA ESTADÍSTICA: Top 5 Géneros más valorados (por número de reseñas)
+    most_rated_genres_query = (
+        select(PeliculaSerie.genero, func.count(Valoracion.id_valoracion).label("total_reviews"))
+        .join(Valoracion, PeliculaSerie.id_titulo == Valoracion.id_titulo_FK)
+        .where(PeliculaSerie.is_active == True, Valoracion.is_active == True)
+        .group_by(PeliculaSerie.genero)
+        .order_by(desc("total_reviews"))
+        .limit(5)
+    )
+    most_rated_genres_results = session.exec(most_rated_genres_query).all()
+    most_rated_genres_labels = [r[0] for r in most_rated_genres_results]
+    most_rated_genres_data = [r[1] for r in most_rated_genres_results]
+
+    # NUEVA ESTADÍSTICA: Títulos por Año de Estreno (Top 5)
+    titles_by_year_query = (
+        select(PeliculaSerie.anio_estreno, func.count(PeliculaSerie.id_titulo).label("total_titles"))
+        .where(PeliculaSerie.is_active == True)
+        .group_by(PeliculaSerie.anio_estreno)
+        .order_by(desc("total_titles"))
+        .limit(5)
+    )
+    titles_by_year_results = session.exec(titles_by_year_query).all()
+    titles_by_year_labels = [str(r[0]) for r in titles_by_year_results]
+    titles_by_year_data = [r[1] for r in titles_by_year_results]
+
     return templates.TemplateResponse("estadisticas.html", {
         "request": request,
+        # KPIs
         "n_usuarios": n_usuarios,
         "n_titulos": n_titulos,
         "n_valoraciones": n_valoraciones,
+        "n_rutinas": n_rutinas,
+        "promedio_global": promedio_global,
+        # Gráficos existentes
         "top_rated_labels": top_rated_labels,
         "top_rated_data": top_rated_data,
         "genre_labels": genre_labels,
-        "genre_data": genre_data
+        "genre_data": genre_data,
+        # Gráficos nuevos
+        "most_rated_genres_labels": most_rated_genres_labels,
+        "most_rated_genres_data": most_rated_genres_data,
+        "titles_by_year_labels": titles_by_year_labels,
+        "titles_by_year_data": titles_by_year_data,
     })
